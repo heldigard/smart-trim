@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783126985.555673,
+      "last_seen": 1783127125.4484124,
       "leased_paths": [
         "/home/eldi/smart-trim/src/smart_trim/shared/config.py",
         "/home/eldi/smart-trim/src/smart_trim/shared/compat.py",
@@ -41,7 +41,8 @@
         "/home/eldi/smart-trim/tests/test_precompact.py",
         "/home/eldi/smart-trim/src/smart_trim/features/session/content.py",
         "/home/eldi/smart-trim/tests/test_layout.py",
-        "topics/foreign-sessions.md,"
+        "topics/foreign-sessions.md,",
+        "/home/eldi/smart-trim/.memory-bank/progress.md"
       ],
       "model": "unknown",
       "started_at": 1783124409.1450212,
@@ -137,6 +138,14 @@
       "lease_id": "56bffde9-27a",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/3:"
+    },
+    "5785c275-aa0": {
+      "acquired_at": 1783127125.4484124,
+      "expires_at": 1783127725.4484124,
+      "holder": "main",
+      "lease_id": "5785c275-aa0",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/.memory-bank/progress.md"
     },
     "591dbed9-ceb": {
       "acquired_at": 1783126602.1868303,
