@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -167,3 +168,101 @@ def test_hours_since_iso_recent_is_small():
 @pytest.mark.parametrize("inp", ["", "   ", "garbage"])
 def test_hours_since_iso_none_cases(inp):
     assert timeutil.hours_since_iso(inp) is None
+
+
+# --- paths.py additional tests ------------------------------------------------
+
+
+def test_has_memory_bank_oserror(monkeypatch):
+    from pathlib import Path
+
+    def fake_is_dir(self):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "is_dir", fake_is_dir)
+    assert not paths._has_memory_bank(Path("/some/path"))
+
+
+def test_git_toplevel_error_and_timeout(monkeypatch):
+    import subprocess
+
+    def fake_run(*args, **kwargs):
+        raise OSError("git not found")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert paths._git_toplevel(Path("/some/path")) is None
+
+    def fake_run_timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["git"], timeout=1)
+
+    monkeypatch.setattr(subprocess, "run", fake_run_timeout)
+    assert paths._git_toplevel(Path("/some/path")) is None
+
+
+def test_git_toplevel_nonzero_exit(monkeypatch):
+    import subprocess
+
+    class FakeResult:
+        def __init__(self, code, out):
+            self.returncode = code
+            self.stdout = out
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeResult(1, ""))
+    assert paths._git_toplevel(Path("/some/path")) is None
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeResult(0, "  \n  "))
+    assert paths._git_toplevel(Path("/some/path")) is None
+
+
+def test_git_toplevel_success(monkeypatch, tmp_path):
+    import subprocess
+
+    class FakeResult:
+        returncode = 0
+
+        def __init__(self, out):
+            self.stdout = out
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeResult(str(tmp_path)))
+    assert paths._git_toplevel(tmp_path) == tmp_path.resolve()
+
+
+def test_get_project_root_resolve_error(monkeypatch):
+    from pathlib import Path
+
+    def fake_expanduser(self):
+        raise ValueError("invalid path")
+
+    monkeypatch.setattr(Path, "expanduser", fake_expanduser)
+    # This should fall back to Path.cwd() without crashing
+    assert isinstance(paths.get_project_root("~nonexistent"), Path)
+
+
+def test_get_project_root_with_git_toplevel(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths, "_git_toplevel", lambda cwd: tmp_path)
+    assert paths.get_project_root(tmp_path / "subdir") == tmp_path
+
+
+def test_config_env_overrides(monkeypatch):
+    import importlib
+
+    from smart_trim.shared import config
+
+    # 1. Valid overrides
+    monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_LOCAL", "50000")
+    monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_CLOUD", "250000")
+    importlib.reload(config)
+    assert config.MAX_CONTEXT_FOR_SUMMARY == 50000
+    assert config.MAX_CONTEXT_FOR_CLOUD == 250000
+
+    # 2. Invalid overrides (ValueError)
+    monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_LOCAL", "invalid")
+    monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_CLOUD", "invalid")
+    importlib.reload(config)
+    assert config.MAX_CONTEXT_FOR_SUMMARY == 20000
+    assert config.MAX_CONTEXT_FOR_CLOUD == 100000
+
+    # Clean up by restoring defaults
+    monkeypatch.delenv("SMART_TRIM_MAX_CONTEXT_LOCAL", raising=False)
+    monkeypatch.delenv("SMART_TRIM_MAX_CONTEXT_CLOUD", raising=False)
+    importlib.reload(config)

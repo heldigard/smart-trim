@@ -107,3 +107,34 @@ def test_foreign_session_false_when_path_inside(tmp_path):
 def test_foreign_session_false_when_no_paths(tmp_path):
     # Conceptual session, no file paths -> treated as host-local.
     assert writer._is_foreign_session("just thinking about the design", tmp_path) is False
+
+
+def test_write_active_limits_lines(tmp_path):
+    project = tmp_path / "proj"
+    project.mkdir()
+    # Create a summary with 40 lines
+    long_summary = "\n".join(f"line {i}" for i in range(40))
+    writer.update_project_memory(long_summary, "fallback", "sess-1", project_root=project)
+    active = project / ".memory-bank" / "activeContext.md"
+    assert active.exists()
+    content = active.read_text(encoding="utf-8")
+    lines = content.splitlines()
+    # The header has 2 lines + at most 26 summary lines = max 28 lines total
+    assert len(lines) <= 28
+
+
+def test_is_foreign_session_resolve_oserror(monkeypatch):
+    class FakePath:
+        def __init__(self, path_str):
+            self.path_str = path_str
+
+        def resolve(self):
+            raise OSError("Access denied")
+
+        def __str__(self):
+            return self.path_str
+
+    # Passing FakePath to _is_foreign_session should fall back to str(project_root) without raising
+    # edit a path that is not under "/dummy"
+    assert writer._is_foreign_session("edit /elsewhere/x.py", FakePath("/dummy")) is True
+    assert writer._is_foreign_session("edit /dummy/x.py", FakePath("/dummy")) is False

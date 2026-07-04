@@ -67,3 +67,60 @@ def test_check_hygiene_silent_under_limit(tmp_path):
 
 def test_check_hygiene_none_when_dir_missing(tmp_path):
     assert hygiene.check_memory_hygiene(summary_dir=tmp_path / "nope") is None
+
+
+def test_default_summary_dir_via_mock(monkeypatch, tmp_path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # This will check tmp_path / ".claude" / "summaries"
+    # Create it so it exists
+    expected_dir = tmp_path / ".claude" / "summaries"
+    expected_dir.mkdir(parents=True)
+    _touch(expected_dir / "test.md")
+
+    # cleanup_old_summaries and check_memory_hygiene with summary_dir=None
+    hygiene.cleanup_old_summaries(max_files=10, summary_dir=None)
+    assert hygiene.check_memory_hygiene(max_files=150, summary_dir=None) is None
+
+
+def test_cleanup_old_summaries_exception(monkeypatch):
+    def fake_is_dir(*args, **kwargs):
+        raise RuntimeError("failed to read dir")
+
+    # We mock is_dir of Path
+    monkeypatch.setattr(Path, "is_dir", fake_is_dir)
+    # Should catch exception and return None
+    hygiene.cleanup_old_summaries(summary_dir=Path("/dummy"))
+
+
+def test_unlink_if_aged_stat_oserror(monkeypatch, tmp_path):
+    # Mock f.stat to raise OSError
+    summaries = tmp_path / "summaries"
+    summaries.mkdir()
+    f = summaries / "test.md"
+    _touch(f)
+
+    def fake_stat(*args, **kwargs):
+        raise OSError("Permission denied")
+
+    monkeypatch.setattr(Path, "stat", fake_stat)
+    assert not hygiene._unlink_if_aged(f, 0.0)
+
+
+def test_safe_unlink_oserror(monkeypatch, tmp_path):
+    f = tmp_path / "test.md"
+    _touch(f)
+
+    def fake_unlink(*args, **kwargs):
+        raise OSError("Read-only file system")
+
+    monkeypatch.setattr(Path, "unlink", fake_unlink)
+    assert not hygiene._safe_unlink(f)
+
+
+def test_check_memory_hygiene_exception(monkeypatch):
+    # Mock exists to raise exception
+    def fake_exists(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(Path, "exists", fake_exists)
+    assert hygiene.check_memory_hygiene(summary_dir=Path("/dummy")) is None

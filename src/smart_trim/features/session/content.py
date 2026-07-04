@@ -96,6 +96,8 @@ def _extract_from_result(block: dict[str, Any], result_cap: int) -> list[str]:
         return _extract_from_result_list(rc, cap)
     if isinstance(rc, str):
         return [f"[Result: {rc[:cap]}]"]
+    if isinstance(rc, dict):
+        return [f"[Result: {json.dumps(rc, ensure_ascii=False)[:cap]}]"]
     return []
 
 

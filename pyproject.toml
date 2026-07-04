@@ -47,3 +47,7 @@ ignore = ["E501"]  # line length handled by formatter; cohesion > wrapping
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/smart_trim"]
+
+[tool.mypy]
+ignore_missing_imports = true
+

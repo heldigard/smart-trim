@@ -26,3 +26,6 @@ Hook shim: `~/.claude/hooks/smart-trim.py` (21L) → `smart_trim.features.precom
 - `post_json` helper: dropped (dead code — defined in v3.2 but never called; summarize uses ollama_client.chat / cheap_complete).
 - `cleanup_old_summaries` / `check_memory_hygiene`: added injectable `summary_dir` param for testability without global Path.home monkeypatch.
 - `compat.py`: sys.path inserts now use ABSOLUTE `~/.claude/{scripts,hooks}` (the `__file__`-relative inserts would have pointed at the wrong dirs from inside the package).
+- 2026-07-04T01:09:12Z | status:completed | session:f089faa9-d9d2-4541-885e-a672096d9aab | claude: session done
+- 2026-07-04T01:17:30Z | status:completed | session:7092ed22-555a-434f-8c1c-3205cfebe549 | gemini: reviewed project, achieved 100% test coverage across all features/shared modules, fixed lint/format warnings, implemented dictionary tool_result serialization, added env var overrides for models/context caps, and verified layout gate compliance.
+

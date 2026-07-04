@@ -143,3 +143,22 @@ def test_cloud_cascade_passes_deepseek_model(monkeypatch):
     assert captured["cloud_model"] == "deepseek/deepseek-v4-flash"
     assert captured["prefer_local"] is False
     assert captured["require_json"] is False
+
+
+def test_summarize_model_env_overrides(monkeypatch):
+    import importlib
+
+    from smart_trim.features.summarize import command as sum_cmd
+
+    # Override models
+    monkeypatch.setenv("SMART_TRIM_PRIMARY_MODEL", "my-primary-model")
+    monkeypatch.setenv("SMART_TRIM_SECONDARY_MODEL", "my-secondary-model")
+    importlib.reload(sum_cmd)
+
+    assert sum_cmd._PRIMARY_MODEL == "my-primary-model"
+    assert sum_cmd._SECONDARY_MODEL == "my-secondary-model"
+
+    # Clean up
+    monkeypatch.delenv("SMART_TRIM_PRIMARY_MODEL", raising=False)
+    monkeypatch.delenv("SMART_TRIM_SECONDARY_MODEL", raising=False)
+    importlib.reload(sum_cmd)

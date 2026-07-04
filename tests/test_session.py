@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 
 from smart_trim.features.session import command as session
 from smart_trim.features.session import content
@@ -168,3 +170,126 @@ def test_find_latest_returns_none_without_claude_env(monkeypatch):
     monkeypatch.delenv("CLAUDE_SESSION_FILE", raising=False)
     monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
     assert session.find_latest_session_jsonl() is None
+
+
+def test_find_latest_session_jsonl_resolves_newest(monkeypatch, tmp_path):
+    # Set up simulated Claude projects directory under tmp_path
+    monkeypatch.setenv("CLAUDE_SESSION_ID", "sess-1")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    projects_dir = tmp_path / ".claude" / "projects"
+
+    # 1. projects_dir not a directory
+    assert session.find_latest_session_jsonl() is None
+
+    projects_dir.mkdir(parents=True)
+    # 2. projects_dir exists but empty
+    assert session.find_latest_session_jsonl() is None
+
+    # 3. Create two project subdirs and some jsonl files
+    p1 = projects_dir / "proj1"
+    p2 = projects_dir / "proj2"
+    p1.mkdir()
+    p2.mkdir()
+
+    import time
+
+    f1 = p1 / "sessionA.jsonl"
+    f2 = p2 / "sessionB.jsonl"
+    f1.write_text("{}", encoding="utf-8")
+    f2.write_text("{}", encoding="utf-8")
+
+    # Set mtimes
+    os.utime(f1, (time.time() - 100, time.time() - 100))
+    os.utime(f2, (time.time(), time.time()))
+
+    # newest should be B
+    assert session.find_latest_session_jsonl() == f2
+
+    # mtime check OSError
+    original_stat = Path.stat
+
+    def fake_stat(*args, **kwargs):
+        if len(args) > 0 and str(args[0]).endswith(".jsonl"):
+            raise OSError("Permission denied")
+        return original_stat(*args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", fake_stat)
+    assert session.find_latest_session_jsonl() is None
+
+
+def test_get_session_file_resolves_from_stdin(monkeypatch, tmp_path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    projects_dir = tmp_path / ".claude" / "projects"
+    p1 = projects_dir / "-home-eldi-app"
+    p1.mkdir(parents=True)
+
+    f1 = p1 / "sess-123.jsonl"
+    f1.write_text("{}", encoding="utf-8")
+
+    # Create a dummy file directly in projects directory to test is_dir check
+    dummy_file = projects_dir / "not-a-dir.txt"
+    dummy_file.write_text("dummy", encoding="utf-8")
+
+    # Resolve using candidate from cwd
+    input_data = {"sessionId": "sess-123", "cwd": "/home/eldi/app"}
+    res = session.get_session_file(input_data)
+    assert res == f1
+
+    # Resolve via search all projects
+    input_data_other_cwd = {"sessionId": "sess-123", "cwd": "/other/path"}
+    res = session.get_session_file(input_data_other_cwd)
+    assert res == f1
+
+    # Resolve with empty stdin data (returns None)
+    monkeypatch.delenv("CLAUDE_SESSION_ID", raising=False)
+    monkeypatch.delenv("CLAUDE_SESSION_FILE", raising=False)
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    assert session._resolve_from_stdin({}) is None
+
+    # Search all projects when session does not exist
+    input_data_not_found = {"sessionId": "sess-999", "cwd": "/other/path"}
+    assert session.get_session_file(input_data_not_found) is None
+
+
+def test_get_context_usage_exception(monkeypatch):
+    monkeypatch.setenv("CLAUDE_CONTEXT_USED", "not-a-number")
+    monkeypatch.setenv("CLAUDE_CONTEXT_TOTAL", "2000")
+    assert session.get_context_usage() == 0.0
+
+
+def test_content_extraction_edge_cases():
+    # 1. non-dict in message
+    msgs = [{"type": "Conversation", "message": "not-a-dict"}]
+    assert content.extract_context_for_summary(msgs) == ""
+
+    # 2. user message has no text/empty text
+    msgs = [{"type": "Conversation", "message": {"role": "user", "content": ""}}]
+    assert content.extract_context_for_summary(msgs) == ""
+
+    # 3. non-string non-dict non-list content (e.g. integer/bool)
+    out = content._extract_text_from_content(12345, "user")
+    assert out == "12345"
+
+    # 4. list of blocks has non-dict block
+    blocks = [12345, {"type": "text", "text": "hello"}]
+    out = content._extract_text_from_content(blocks, "user")
+    assert "hello" in out
+
+    # 5. tool result contains a list of text result blocks
+    tool_res_list = [
+        {"type": "tool_result", "content": [{"type": "text", "text": "result-block-content"}]}
+    ]
+    out = content._extract_text_from_content(tool_res_list, "assistant")
+    assert "result-block-content" in out
+
+    # 6. tool result contains non-list non-string content (e.g. dict or integer)
+    tool_res_other = [{"type": "tool_result", "content": 12345}]
+    out = content._extract_text_from_content(tool_res_other, "assistant")
+    # should skip or return empty for this block
+    assert "12345" not in out
+
+    # 7. tool result contains dict content
+    tool_res_dict = [{"type": "tool_result", "content": {"status": "ok"}}]
+    out = content._extract_text_from_content(tool_res_dict, "assistant")
+    assert '{"status": "ok"}' in out

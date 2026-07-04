@@ -9,7 +9,7 @@ Each tier returns ``None`` on failure so the caller falls through. Cloud tier
 only runs when both local tiers are down — keeps most summaries on-machine.
 """
 
-from __future__ import annotations
+import os
 
 from smart_trim.shared import compat
 from smart_trim.shared.config import OLLAMA_BASE
@@ -20,8 +20,10 @@ _SYSTEM_PROMPT = (
     "Use the provided TASK/PROGRESS grounding to keep focus. Discard filler."
 )
 
-_PRIMARY_MODEL = "qwen3.5:4b"
-_SECONDARY_MODEL = "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU"
+_PRIMARY_MODEL = os.environ.get("SMART_TRIM_PRIMARY_MODEL", "qwen3.5:4b")
+_SECONDARY_MODEL = os.environ.get(
+    "SMART_TRIM_SECONDARY_MODEL", "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU"
+)
 
 
 def get_summary_prompt(context: str, grounding: str = "") -> str:

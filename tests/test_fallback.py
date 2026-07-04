@@ -53,3 +53,19 @@ def test_fallback_unwraps_message_envelope():
     msgs = [{"role": "user", "content": "naked message"}]
     out = fallback.generate_fallback_summary(msgs)
     assert "1 user requests" in out
+
+
+def test_fallback_caps_at_three_decisions():
+    msgs = [
+        _envelope("user", "we decided to do A"),
+        _envelope("user", "we agreed on B"),
+        _envelope("user", "we chose C"),
+        _envelope("user", "decision: do D"),
+    ]
+    out = fallback.generate_fallback_summary(msgs)
+    # We should have at most 3 decisions listed under Decisions
+    # Since we extract from each message, and we break when len(decisions) >= 3, we should only see A, B, C.
+    assert "decided to do A" in out
+    assert "agreed on B" in out
+    assert "chose C" in out
+    assert "do D" not in out

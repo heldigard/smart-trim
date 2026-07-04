@@ -29,3 +29,14 @@ is one end-to-end PreCompact pipeline).
 - Keep as hook-internal package under `~/.claude/hooks/smart_trim/` — less
   ceremony but no isolated git history / .memory-bank / versioning.
 - Make it a CLI console script — wrong shape; it's a stdin-JSON hook.
+
+## 2026-07-03 — Customization & Robustness Enhancements
+
+**Decision**:
+1. Support env overrides for primary/secondary local Ollama models (`SMART_TRIM_PRIMARY_MODEL`, `SMART_TRIM_SECONDARY_MODEL`).
+2. Support env overrides for local/cloud context caps (`SMART_TRIM_MAX_CONTEXT_LOCAL`, `SMART_TRIM_MAX_CONTEXT_CLOUD`).
+3. Serialize structured dictionary content inside `tool_result` blocks.
+
+**Why**:
+Users wanted customization to match their local GPU capacities (VRAM/context window size). Also, some tools return structured dictionary output in `tool_result`, which previously got skipped, causing information loss.
+

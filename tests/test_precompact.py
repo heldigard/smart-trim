@@ -243,3 +243,146 @@ def test_returns_continue_true_with_systemmessage_on_auto(tmp_path, monkeypatch)
     )
     assert result["continue"] is True
     assert "systemMessage" in result
+
+
+def test_precompact_safe_reset_cg_exception(monkeypatch):
+    def fake_cg_reset():
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(precompact._compat, "cg_reset", fake_cg_reset)
+    # Should not raise exception
+    precompact._safe_reset_cg()
+
+
+def test_precompact_build_grounding_variations(tmp_path, monkeypatch):
+    # Mock grounding load to return empty, and objective registry to return something
+    monkeypatch.setattr(precompact._grounding, "load_memory_grounding", lambda r: "")
+    monkeypatch.setattr(precompact._grounding, "load_objective_registry", lambda r: "obj-block")
+    g, obj = precompact._build_grounding(tmp_path)
+    assert g == "obj-block"
+    assert obj == "obj-block"
+
+
+def test_precompact_minimal_handoff_empty_messages(tmp_path, monkeypatch):
+    session_file = tmp_path / "session.jsonl"
+    session_file.write_text("", encoding="utf-8")
+    monkeypatch.setattr(precompact._session, "read_session", lambda f: [])
+    monkeypatch.setattr(precompact._grounding, "extract_negative_constraints", lambda g: "")
+
+    text, method, preserved = precompact._resolve_summary(
+        session_file, grounding="", objective_block="", session_id="s", trigger="auto"
+    )
+    assert method == "minimal"
+
+
+def test_precompact_secondary_ollama_success(tmp_path, monkeypatch):
+    monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
+    monkeypatch.setattr(
+        precompact._summarize, "summarize_primary", lambda context, grounding="": None
+    )
+    monkeypatch.setattr(
+        precompact._summarize, "summarize_secondary", lambda context, grounding="": "secondary ok"
+    )
+
+    text, method = precompact._try_local("context", "grounding")
+    assert text == "secondary ok"
+    assert method == "ollama-setneuf-qwopus3.5"
+
+
+def test_precompact_archive_summary(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    precompact._archive_summary("summary-text", "method-name", "auto", "session-id")
+
+    archive_dir = tmp_path / ".claude" / "summaries"
+    assert archive_dir.is_dir()
+    files = list(archive_dir.glob("*.md"))
+    assert len(files) == 1
+    content = files[0].read_text(encoding="utf-8")
+    assert "summary-text" in content
+    assert "method-name" in content
+
+    # Test exception handling (mkdir raises OSError)
+    def fake_mkdir(self, *args, **kwargs):
+        raise OSError("Permission denied")
+
+    monkeypatch.setattr(Path, "mkdir", fake_mkdir)
+    # Should not raise exception
+    precompact._archive_summary("summary-text", "method-name", "auto", "session-id")
+
+
+def test_precompact_returns_warning_on_auto(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    (project / ".memory-bank").mkdir(parents=True)
+    _disable_external(monkeypatch)
+    monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: None)
+    monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.cleanup_old_summaries", lambda *a, **k: None
+    )
+    # Return a warning
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.check_memory_hygiene",
+        lambda *a, **k: "Hygiene warning",
+    )
+    monkeypatch.setattr(f"{_WRITER}.update_project_memory", lambda *a, **k: None)
+
+    result = precompact.handle_precompact(
+        {"trigger": "auto", "sessionId": "s", "cwd": str(project)}
+    )
+    assert result["continue"] is True
+    assert "Hygiene warning" in result["systemMessage"]
+
+
+def test_precompact_main_entry(monkeypatch, capsys):
+    import io
+    import sys
+
+    import pytest
+
+    # 1. Valid dict input
+    monkeypatch.setattr(sys, "stdin", io.StringIO('{"trigger":"manual","sessionId":"s"}'))
+    monkeypatch.setattr(precompact, "handle_precompact", lambda data: {"continue": True})
+
+    precompact.main()
+    captured = capsys.readouterr()
+    assert '{"continue": true}' in captured.out
+
+    # 2. Non-dict input (should exit early silently)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("[]"))
+    with pytest.raises(SystemExit) as e:
+        precompact.main()
+    assert e.value.code == 0
+
+    # 3. Bad JSON (should exit early silently)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("{bad json}"))
+    with pytest.raises(SystemExit) as e:
+        precompact.main()
+    assert e.value.code == 0
+
+
+def test_precompact_try_local_returns_none_none(monkeypatch):
+    monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
+    monkeypatch.setattr(
+        precompact._summarize, "summarize_primary", lambda context, grounding="": None
+    )
+    monkeypatch.setattr(
+        precompact._summarize, "summarize_secondary", lambda context, grounding="": None
+    )
+
+    text, method = precompact._try_local("context", "grounding")
+    assert text is None
+    assert method is None
+
+
+def test_precompact_augment_objective():
+    summary = "some summary"
+    obj = "objective block text"
+    res = precompact._augment(summary, preserved="", objective_block=obj)
+    assert res == f"{obj}\n\n{summary}"
+
+
+def test_precompact_join_grounding():
+    assert precompact._join_grounding("grounding", "") == "grounding"
+    assert precompact._join_grounding("", "preserved") == "preserved"
+    assert precompact._join_grounding("", "") == ""
+    assert precompact._join_grounding("grounding", "preserved") == "grounding\n\npreserved"
