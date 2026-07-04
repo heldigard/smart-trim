@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783125378.654985,
+      "last_seen": 1783125623.83111,
       "leased_paths": [
         "/home/eldi/smart-trim/src/smart_trim/shared/config.py",
         "/home/eldi/smart-trim/src/smart_trim/shared/compat.py",
@@ -29,7 +29,13 @@
         "/home/eldi/smart-trim/tests/test_fallback.py",
         "/home/eldi/smart-trim/tests/test_summarize.py",
         "/home/eldi/smart-trim/tests/test_hygiene.py",
-        "cloud"
+        "cloud",
+        "/home/eldi/smart-trim/src/smart_trim/features/grounding/__init__.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/grounding/command.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/writer/__init__.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/writer/command.py",
+        "/home/eldi/smart-trim/tests/test_grounding.py",
+        "/home/eldi/smart-trim/tests/test_writer.py"
       ],
       "model": "unknown",
       "started_at": 1783124409.1450212,
@@ -38,6 +44,14 @@
     }
   },
   "leases": {
+    "07fbaa78-a38": {
+      "acquired_at": 1783125590.0437667,
+      "expires_at": 1783126190.0437667,
+      "holder": "main",
+      "lease_id": "07fbaa78-a38",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_grounding.py"
+    },
     "1845be58-054": {
       "acquired_at": 1783125270.2531161,
       "expires_at": 1783125870.2531161,
@@ -88,11 +102,19 @@
     },
     "56bffde9-27a": {
       "acquired_at": 1783124911.3475435,
-      "expires_at": 1783125759.3413908,
+      "expires_at": 1783126097.5582356,
       "holder": "main",
       "lease_id": "56bffde9-27a",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/3:"
+    },
+    "6e2a9f2f-ee2": {
+      "acquired_at": 1783125464.7481756,
+      "expires_at": 1783126064.7481756,
+      "holder": "main",
+      "lease_id": "6e2a9f2f-ee2",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/writer/__init__.py"
     },
     "781315e3-c13": {
       "acquired_at": 1783124751.183887,
@@ -126,6 +148,14 @@
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/features/session/command.py"
     },
+    "a4790afa-807": {
+      "acquired_at": 1783125464.4542384,
+      "expires_at": 1783126138.144871,
+      "holder": "main",
+      "lease_id": "a4790afa-807",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/grounding/command.py"
+    },
     "ae598028-a58": {
       "acquired_at": 1783125159.2772696,
       "expires_at": 1783125759.2772696,
@@ -144,7 +174,7 @@
     },
     "b7c15ba4-3b1": {
       "acquired_at": 1783124669.7592778,
-      "expires_at": 1783125978.654985,
+      "expires_at": 1783126223.83111,
       "holder": "main",
       "lease_id": "b7c15ba4-3b1",
       "mode": "exclusive",
@@ -157,6 +187,14 @@
       "lease_id": "b87de49c-f68",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/cloud"
+    },
+    "bd03db00-b4c": {
+      "acquired_at": 1783125439.9627464,
+      "expires_at": 1783126039.9627464,
+      "holder": "main",
+      "lease_id": "bd03db00-b4c",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/grounding/__init__.py"
     },
     "c2a209d8-38d": {
       "acquired_at": 1783124429.6980677,
@@ -190,6 +228,14 @@
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/features/summarize/command.py"
     },
+    "d7194475-aa8": {
+      "acquired_at": 1783125478.633656,
+      "expires_at": 1783126137.8453283,
+      "holder": "main",
+      "lease_id": "d7194475-aa8",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/writer/command.py"
+    },
     "dc9e485e-289": {
       "acquired_at": 1783124727.539611,
       "expires_at": 1783125715.0484295,
@@ -205,6 +251,14 @@
       "lease_id": "e0a77fba-a9b",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/tests/test_fallback.py"
+    },
+    "e62374a2-825": {
+      "acquired_at": 1783125603.8007877,
+      "expires_at": 1783126203.8007877,
+      "holder": "main",
+      "lease_id": "e62374a2-825",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_writer.py"
     },
     "f3c20bb2-e28": {
       "acquired_at": 1783124601.1579347,
