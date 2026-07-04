@@ -1,12 +1,33 @@
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
 *.egg-info/
 .eggs/
-build/
 dist/
-.venv/
+build/
 .coverage
+htmlcov/
+.mypy_cache/
 .pytest_cache/
 .ruff_cache/
-.mypy_cache/
+.tags
 *.bak
+*.log
+.memory-bank/.index/
+
+# Local Claude Code harness artifacts (auto-setup marker, orchestrator registry).
+# Machine-specific (absolute /home/<user> paths) — not source of truth, perpetual
+# dirty-tree noise if tracked. Matches the prompt-improve/codeq sibling convention.
+.claude/
+
+# Orchestration registry churn — auto-regenerated each session by the cross-CLI
+# coordination layer; stays on disk for all CLIs to read, but is not source of truth.
+.memory-bank/agent-sessions.md
+.memory-bank/topics/agent-sessions.md
+.memory-bank/topics/foreign-sessions.md
+
+# uv lockfile — hook/package, not a deployable app
+uv.lock
