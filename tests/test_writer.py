@@ -1,10 +1,10 @@
 """Tests for features/writer (write-side)."""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 from smart_trim.features.writer import command as writer
-
 
 # --- update_project_memory ---------------------------------------------------
 

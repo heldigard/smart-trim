@@ -1,4 +1,5 @@
 """Tests for features/fallback."""
+
 from __future__ import annotations
 
 from smart_trim.features.fallback import command as fallback

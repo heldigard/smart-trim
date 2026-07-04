@@ -6,6 +6,7 @@ for the harness helpers (``ollama_client`` / ``cheap_complete`` /
 gracefully. Every feature module can then ``from smart_trim.shared.compat
 import ollama_client`` and get either the real module or ``None``.
 """
+
 from __future__ import annotations
 
 # Side effect: sys.path bootstrap + graceful helper imports. MUST run before any

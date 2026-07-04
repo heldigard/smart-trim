@@ -6,6 +6,7 @@ stops once ``max_length`` chars are accumulated so the local LLM stays within
 its VRAM/ctx budget. Distinct from session *discovery* (command.py): this
 module only shapes already-loaded messages for summarization.
 """
+
 from __future__ import annotations
 
 import json
@@ -61,9 +62,7 @@ def _extract_text_from_content(content: Any, role: str) -> str:
     return str(content)[:500]
 
 
-def _extract_from_blocks(
-    blocks: list[Any], text_cap: int, result_cap: int
-) -> list[str]:
+def _extract_from_blocks(blocks: list[Any], text_cap: int, result_cap: int) -> list[str]:
     """Flatten a content-block list into text fragments (thinking blocks skipped)."""
     parts: list[str] = []
     for block in blocks:

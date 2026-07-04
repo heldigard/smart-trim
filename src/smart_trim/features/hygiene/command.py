@@ -5,12 +5,12 @@ so the post-write state equals ``max_files`` rather than ``max_files + 1``).
 ``check_memory_hygiene`` surfaces a warning only when that rotation is clearly
 not keeping up (count > max_files), avoiding a permanent inactionable nag.
 """
+
 from __future__ import annotations
 
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 def _default_summary_dir() -> Path:
@@ -58,9 +58,7 @@ def _unlink_if_aged(f: Path, cutoff: float) -> bool:
 
 def _enforce_cap(summary_dir: Path, max_files: int) -> int:
     # If still too many, keep only the newest max_files
-    remaining = sorted(
-        summary_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True
-    )
+    remaining = sorted(summary_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
     removed = 0
     for f in remaining[max_files:]:
         if _safe_unlink(f):
@@ -76,7 +74,7 @@ def _safe_unlink(f: Path) -> bool:
         return False
 
 
-def check_memory_hygiene(max_files: int = 150, summary_dir: Path | None = None) -> Optional[str]:
+def check_memory_hygiene(max_files: int = 150, summary_dir: Path | None = None) -> str | None:
     """Check if summaries directory is getting large."""
     summary_dir = summary_dir if summary_dir is not None else _default_summary_dir()
     try:
@@ -87,10 +85,7 @@ def check_memory_hygiene(max_files: int = 150, summary_dir: Path | None = None) 
         # cleanup is failing (previously >100 = permanent inactionable nag).
         if count <= max_files:
             return None
-        return (
-            f"Note: {count} session summaries stored — "
-            "cleanup_old_summaries is not keeping up."
-        )
+        return f"Note: {count} session summaries stored — cleanup_old_summaries is not keeping up."
     except Exception:
         return None
 

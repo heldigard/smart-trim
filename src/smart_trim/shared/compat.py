@@ -18,6 +18,7 @@ Importing this module has the side effect of extending ``sys.path`` exactly once
 module-level names below and guards with ``is None`` checks so a missing helper
 degrades gracefully to rule-based fallback rather than crashing the hook.
 """
+
 # pyright: reportMissingImports=false
 # The three harness helpers below live under ~/.claude/{scripts,hooks}/ and
 # are added to sys.path at runtime by this module — Pyright cannot see them

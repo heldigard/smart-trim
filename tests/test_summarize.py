@@ -1,11 +1,9 @@
 """Tests for features/summarize."""
+
 from __future__ import annotations
 
-import pytest
-
-from smart_trim.shared import compat
 from smart_trim.features.summarize import command as summarize
-
+from smart_trim.shared import compat
 
 # --- get_summary_prompt ------------------------------------------------------
 

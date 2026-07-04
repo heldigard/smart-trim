@@ -1,4 +1,5 @@
 """Shared pytest fixtures for smart-trim."""
+
 from __future__ import annotations
 
 import sys

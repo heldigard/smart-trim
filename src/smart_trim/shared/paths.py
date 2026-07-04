@@ -5,6 +5,7 @@ git toplevel) without depending on shell aliases. ``redact_sensitive`` strips
 likely secret-bearing lines before they reach project memory or cloud.
 ``slugify`` produces filesystem-safe topic slugs.
 """
+
 from __future__ import annotations
 
 import re

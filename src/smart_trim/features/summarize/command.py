@@ -8,9 +8,8 @@ Chain:
 Each tier returns ``None`` on failure so the caller falls through. Cloud tier
 only runs when both local tiers are down — keeps most summaries on-machine.
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from smart_trim.shared import compat
 from smart_trim.shared.config import OLLAMA_BASE
@@ -52,9 +51,7 @@ Format:
 **Files**: [list of all files touched]"""
 
 
-def summarize_ollama(
-    context: str, model: str, grounding: str = ""
-) -> Optional[str]:
+def summarize_ollama(context: str, model: str, grounding: str = "") -> str | None:
     """Summarize using an Ollama local model (via shared ollama_client.chat)."""
     if compat.ollama_client is None:
         return None
@@ -82,7 +79,7 @@ def summarize_ollama(
         return None
 
 
-def summarize_primary(context: str, grounding: str = "") -> Optional[str]:
+def summarize_primary(context: str, grounding: str = "") -> str | None:
     """PRIMARY: Ollama qwen3.5:4b (clean handoffs, ~5s, 3.4GB VRAM).
 
     carstenuhlig/omnicoder-9b demoted 2026-06-27: reasoning model that burns its
@@ -92,15 +89,13 @@ def summarize_primary(context: str, grounding: str = "") -> Optional[str]:
     return summarize_ollama(context, _PRIMARY_MODEL, grounding=grounding)
 
 
-def summarize_secondary(context: str, grounding: str = "") -> Optional[str]:
+def summarize_secondary(context: str, grounding: str = "") -> str | None:
     """SECONDARY: Ollama Qwopus3.5-4B-Coder-MTP (longctx/reason winner 2026-06-28:
     longctx 9/10 facts, reason 1.0, 174 tok/s, 2.8GB VRAM, no think-leak)."""
     return summarize_ollama(context, _SECONDARY_MODEL, grounding=grounding)
 
 
-def summarize_cloud_cascade(
-    context: str, grounding: str = ""
-) -> Optional[str]:
+def summarize_cloud_cascade(context: str, grounding: str = "") -> str | None:
     """TERTIARY: cheap_llm cloud cascade (secret-scrubbed, cross-provider failover).
 
     Only called when BOTH local Ollama models are unavailable. Context is scrubbed

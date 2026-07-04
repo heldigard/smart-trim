@@ -10,6 +10,7 @@ NOTE: ``_load_project_memory`` resolves the freshness helper at the ABSOLUTE pat
 relative to ``__file__`` (``parent.parent / scripts``), which broke after the
 package split moved ``__file__`` — so this is a corrected absolute resolution.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -33,13 +34,13 @@ def load_memory_grounding(project_root: Path) -> str:
     parts: list[str] = []
     _add_section(parts, bank / "currentTask.md", "Current Task (from currentTask.md)", 1500, False)
     _add_section(parts, bank / "progress.md", "Recent Progress (from progress.md)", 1000, True)
-    _add_section(parts, bank / "activeContext.md", "Previous Handoff (from activeContext.md)", 800, True)
+    _add_section(
+        parts, bank / "activeContext.md", "Previous Handoff (from activeContext.md)", 800, True
+    )
     return "\n\n".join(parts)
 
 
-def _add_section(
-    parts: list[str], path: Path, title: str, max_chars: int, from_end: bool
-) -> None:
+def _add_section(parts: list[str], path: Path, title: str, max_chars: int, from_end: bool) -> None:
     if not path.exists():
         return
     lines = _filtered_memory_lines(path.name, path)
@@ -145,9 +146,7 @@ def _objective_stale_for_injection(data: dict[str, Any]) -> bool:
     if state in {"done", "complete", "completed", "shipped", "closed", "archived"}:
         return True
     task_guidance = data.get("task_guidance")
-    guidance_updated = (
-        task_guidance.get("updated_at") if isinstance(task_guidance, dict) else ""
-    )
+    guidance_updated = task_guidance.get("updated_at") if isinstance(task_guidance, dict) else ""
     updated_at = str(data.get("updated_at") or guidance_updated or "")
     age = hours_since_iso(updated_at)
     if age is None:

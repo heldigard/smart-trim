@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783126602.1868303,
+      "last_seen": 1783126985.555673,
       "leased_paths": [
         "/home/eldi/smart-trim/src/smart_trim/shared/config.py",
         "/home/eldi/smart-trim/src/smart_trim/shared/compat.py",
@@ -40,7 +40,8 @@
         "/home/eldi/smart-trim/src/smart_trim/features/precompact/command.py",
         "/home/eldi/smart-trim/tests/test_precompact.py",
         "/home/eldi/smart-trim/src/smart_trim/features/session/content.py",
-        "/home/eldi/smart-trim/tests/test_layout.py"
+        "/home/eldi/smart-trim/tests/test_layout.py",
+        "topics/foreign-sessions.md,"
       ],
       "model": "unknown",
       "started_at": 1783124409.1450212,
@@ -88,6 +89,14 @@
       "lease_id": "29947934-dac",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/shared/config.py"
+    },
+    "2c5919b6-63e": {
+      "acquired_at": 1783126985.4908166,
+      "expires_at": 1783127585.4908166,
+      "holder": "main",
+      "lease_id": "2c5919b6-63e",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/topics/foreign-sessions.md,"
     },
     "3705f0b5-c85": {
       "acquired_at": 1783124751.509707,
@@ -211,7 +220,7 @@
     },
     "b7c15ba4-3b1": {
       "acquired_at": 1783124669.7592778,
-      "expires_at": 1783126559.327193,
+      "expires_at": 1783127585.555673,
       "holder": "main",
       "lease_id": "b7c15ba4-3b1",
       "mode": "exclusive",

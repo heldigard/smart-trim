@@ -3,6 +3,7 @@
 Single source of truth for tunables shared across features. No runtime side
 effects, no imports beyond stdlib — safe to import from anywhere.
 """
+
 from __future__ import annotations
 
 import re
@@ -17,8 +18,8 @@ OLLAMA_LIVENESS_TIMEOUT = 0.5
 # --- Context caps ----------------------------------------------------------
 MAX_CONTEXT_FOR_SUMMARY = 20000  # Max chars to send to LOCAL LLM (VRAM/ctx bound)
 MAX_CONTEXT_FOR_CLOUD = 100000  # Cloud tier (DeepSeek 1M ctx) digests ~5x more
-                                # than local's 20K cap — preserves early decisions
-                                # / root-causes in long sessions approaching compact.
+# than local's 20K cap — preserves early decisions
+# / root-causes in long sessions approaching compact.
 MAX_FALLBACK_SUMMARY = 3000  # Max chars for rule-based fallback
 
 # --- Redaction / constraint patterns ---------------------------------------

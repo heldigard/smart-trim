@@ -3,6 +3,7 @@
 ``is_ollama_alive`` is a quick TCP probe cached per invocation (a single compact
 calls it once; the cache avoids repeated 0.5s timeouts when the daemon is down).
 """
+
 from __future__ import annotations
 
 import socket
@@ -20,9 +21,7 @@ def is_ollama_alive() -> bool:
     if _OLLAMA_ALIVE is not None:
         return _OLLAMA_ALIVE
     try:
-        sock = socket.create_connection(
-            (OLLAMA_HOST, OLLAMA_PORT), timeout=OLLAMA_LIVENESS_TIMEOUT
-        )
+        sock = socket.create_connection((OLLAMA_HOST, OLLAMA_PORT), timeout=OLLAMA_LIVENESS_TIMEOUT)
         sock.close()
         _OLLAMA_ALIVE = True
     except OSError:

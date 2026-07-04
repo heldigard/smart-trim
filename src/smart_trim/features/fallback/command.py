@@ -4,6 +4,7 @@ Last-resort handoff when the entire LLM cascade (Ollama primary/secondary +
 cloud tertiary) is unavailable. Extracts file paths, error lines and decision
 cues from the raw messages with plain regex so it works offline and in <1ms.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,9 +14,7 @@ from typing import Any
 from smart_trim.shared.config import MAX_FALLBACK_SUMMARY
 
 
-def generate_fallback_summary(
-    messages: list[dict[str, Any]], session_id: str = "unknown"
-) -> str:
+def generate_fallback_summary(messages: list[dict[str, Any]], session_id: str = "unknown") -> str:
     """Generate basic summary without LLM (last resort)."""
     # Normalize: unwrap 'message' envelope for all messages
     normalized: list[dict[str, Any]] = []
@@ -31,9 +30,7 @@ def generate_fallback_summary(
     decisions = _extract_decisions(normalized)
 
     error_str = "\n".join([f"- {e}" for e in errors]) if errors else "None detected"
-    decision_str = (
-        "\n".join([f"- {d}" for d in decisions]) if decisions else "None detected"
-    )
+    decision_str = "\n".join([f"- {d}" for d in decisions]) if decisions else "None detected"
 
     summary = f"""**Task**: Session with {len(user_msgs)} user requests
 **Files**: {", ".join(list(file_paths)[:8]) if file_paths else "None"}

@@ -15,6 +15,7 @@ PreCompact hook output schema: only top-level ``continue`` / ``systemMessage`` /
 discarded, so the summary is saved to the project memory bank and surfaced via
 ``systemMessage``. ``memory-inject.sh`` reloads it on the next SessionStart.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,16 +25,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from smart_trim.shared import compat as _compat
-from smart_trim.shared import ollama as _ollama
-from smart_trim.shared import paths as _paths
-from smart_trim.shared.config import MAX_CONTEXT_FOR_CLOUD
 from smart_trim.features.fallback import command as _fallback
 from smart_trim.features.grounding import command as _grounding
 from smart_trim.features.hygiene import command as _hygiene
 from smart_trim.features.session import command as _session
 from smart_trim.features.summarize import command as _summarize
 from smart_trim.features.writer import command as _writer
+from smart_trim.shared import compat as _compat
+from smart_trim.shared import ollama as _ollama
+from smart_trim.shared import paths as _paths
+from smart_trim.shared.config import MAX_CONTEXT_FOR_CLOUD
 
 _POST_COMPACT_RULES = (
     "\n---\n"
@@ -152,9 +153,7 @@ def _try_local(context: str, summary_grounding: str) -> tuple[str | None, str | 
     return None, None
 
 
-def _try_cloud(
-    messages: list, grounding: str, preserved: str
-) -> tuple[str | None, str | None]:
+def _try_cloud(messages: list, grounding: str, preserved: str) -> tuple[str | None, str | None]:
     """Cloud cascade tier (re-extracts at the larger cap for DeepSeek 1M ctx)."""
     cloud_context = _session.extract_context_for_summary(messages, max_length=MAX_CONTEXT_FOR_CLOUD)
     new_preserved = _grounding.extract_negative_constraints(cloud_context)
@@ -191,7 +190,7 @@ def _archive_summary(summary_text: str, method: str, trigger: str, session_id: s
 def _final_message(method: str, trigger: str, memory_warning: str | None) -> dict[str, Any]:
     """Build the PreCompact return dict (manual /compact stays silent)."""
     is_manual = trigger == "manual"
-    saved = "[smart-trim] {m} summary saved to .memory-bank/activeContext.md".format(m=method)
+    saved = f"[smart-trim] {method} summary saved to .memory-bank/activeContext.md"
     if memory_warning and not is_manual:
         return {"continue": True, "systemMessage": f"{saved}. {memory_warning}"}
     if is_manual:

@@ -5,11 +5,11 @@ enough to inject into a compact handoff. Window is overridable via env so tests
 can pin it (``OBJECTIVE_INJECTION_WINDOW_HOURS`` /
 ``MEMORY_INJECTION_ACTIVE_WINDOW_HOURS``).
 """
+
 from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Optional
 
 
 def objective_injection_window_hours() -> float:
@@ -24,7 +24,7 @@ def objective_injection_window_hours() -> float:
         return 24.0
 
 
-def hours_since_iso(value: str) -> Optional[float]:
+def hours_since_iso(value: str) -> float | None:
     value = value.strip()
     if not value:
         return None

@@ -1,13 +1,13 @@
 """Tests for the shared/ infrastructure layer."""
+
 from __future__ import annotations
 
 import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from smart_trim.shared import ollama, paths, timeutil
-
 
 # --- get_project_root --------------------------------------------------------
 
@@ -159,7 +159,7 @@ def test_hours_since_iso_invalid_returns_none():
 
 
 def test_hours_since_iso_recent_is_small():
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     h = timeutil.hours_since_iso(now_iso)
     assert h is not None and h < 1.0
 

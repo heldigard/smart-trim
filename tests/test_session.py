@@ -1,12 +1,11 @@
 """Tests for features/session."""
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from smart_trim.features.session import command as session
 from smart_trim.features.session import content
-
 
 # --- get_session_id ----------------------------------------------------------
 
@@ -54,8 +53,10 @@ def test_get_context_usage_zero_total(monkeypatch):
 def test_read_session_parses_jsonl(tmp_path):
     f = tmp_path / "s.jsonl"
     f.write_text(
-        json.dumps({"type": "user", "message": {"role": "user", "content": "hi"}}) + "\n"
-        + json.dumps({"type": "assistant"}) + "\n"
+        json.dumps({"type": "user", "message": {"role": "user", "content": "hi"}})
+        + "\n"
+        + json.dumps({"type": "assistant"})
+        + "\n"
         + "\n"  # blank line skipped
         + "not-json\n",  # malformed skipped
         encoding="utf-8",

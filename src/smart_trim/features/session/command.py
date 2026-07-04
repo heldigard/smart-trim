@@ -8,6 +8,7 @@ Resolution order for the session file:
 Content *extraction* (shaping messages for the LLM) lives in ``content.py`` — a
 distinct sub-responsibility, kept separate so discovery stays small.
 """
+
 from __future__ import annotations
 
 import json
@@ -140,7 +141,7 @@ def read_session(session_file: Path) -> list[dict[str, Any]]:
     """Read session from JSONL file (skip blank/malformed lines)."""
     if not session_file.exists():
         return []
-    with open(session_file, "r", encoding="utf-8") as f:
+    with open(session_file, encoding="utf-8") as f:
         lines = f.readlines()
     parsed = [_parse_jsonl_line(ln) for ln in lines]
     return [msg for msg in parsed if msg is not None]

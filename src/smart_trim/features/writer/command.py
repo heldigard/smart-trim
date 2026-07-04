@@ -5,12 +5,12 @@ a deep-copy entry to ``.memory-bank/topics/session-handoffs.md``. Cross-project
 sessions (file paths outside this bank's root) are routed to a
 ``foreign-sessions`` topic so the host activeContext stays clean.
 """
+
 from __future__ import annotations
 
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from smart_trim.shared.paths import get_project_root, redact_sensitive, slugify
 
@@ -19,7 +19,7 @@ def update_project_memory(
     summary: str,
     method: str,
     session_id: str = "unknown",
-    project_root: Optional[Path] = None,
+    project_root: Path | None = None,
 ) -> None:
     """Write compact and deep handoffs to the shared project memory bank."""
     try:

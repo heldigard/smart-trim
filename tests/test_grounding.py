@@ -1,12 +1,12 @@
 """Tests for features/grounding (read-side)."""
+
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from smart_trim.features.grounding import command as grounding
-
 
 # --- load_memory_grounding ---------------------------------------------------
 
@@ -122,7 +122,7 @@ def test_objective_registry_keeps_fresh_same_project(tmp_path, monkeypatch):
     project.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("OBJECTIVE_INJECTION_WINDOW_HOURS", "12")
-    fresh = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    fresh = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
     _write_objective(
         home,
         {
@@ -143,10 +143,15 @@ def test_objective_registry_skips_terminal_status(tmp_path, monkeypatch):
     project.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("OBJECTIVE_INJECTION_WINDOW_HOURS", raising=False)
-    fresh = datetime.now(timezone.utc).isoformat()
+    fresh = datetime.now(UTC).isoformat()
     _write_objective(
         home,
-        {"task": "done thing", "status": "shipped", "project_root": str(project), "updated_at": fresh},
+        {
+            "task": "done thing",
+            "status": "shipped",
+            "project_root": str(project),
+            "updated_at": fresh,
+        },
     )
     assert grounding.load_objective_registry(project) == ""
 
@@ -158,7 +163,7 @@ def test_objective_registry_skips_foreign_project(tmp_path, monkeypatch):
     project.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("OBJECTIVE_INJECTION_WINDOW_HOURS", raising=False)
-    fresh = datetime.now(timezone.utc).isoformat()
+    fresh = datetime.now(UTC).isoformat()
     _write_objective(
         home,
         {"task": "other project", "project_root": str(other), "updated_at": fresh},

@@ -4,6 +4,7 @@ Mirrors codeq's test_codeq_modular_layout. A module may exceed the meta only
 when it is genuinely cohesive (one responsibility, a single pipeline); such
 exceptions are listed in ALLOWLIST with the reason and re-reviewed on change.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -46,8 +47,7 @@ def test_every_module_present():
 def test_modules_under_meta():
     over = [(rel, n) for rel, n in _python_modules() if n > META and rel not in ALLOWLIST]
     assert not over, (
-        f"modules over the {META}L meta (split or add to ALLOWLIST with a reason): "
-        f"{over}"
+        f"modules over the {META}L meta (split or add to ALLOWLIST with a reason): {over}"
     )
 
 
