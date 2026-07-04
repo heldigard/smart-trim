@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783125623.83111,
+      "last_seen": 1783125959.327193,
       "leased_paths": [
         "/home/eldi/smart-trim/src/smart_trim/shared/config.py",
         "/home/eldi/smart-trim/src/smart_trim/shared/compat.py",
@@ -35,7 +35,10 @@
         "/home/eldi/smart-trim/src/smart_trim/features/writer/__init__.py",
         "/home/eldi/smart-trim/src/smart_trim/features/writer/command.py",
         "/home/eldi/smart-trim/tests/test_grounding.py",
-        "/home/eldi/smart-trim/tests/test_writer.py"
+        "/home/eldi/smart-trim/tests/test_writer.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/precompact/__init__.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/precompact/command.py",
+        "/home/eldi/smart-trim/tests/test_precompact.py"
       ],
       "model": "unknown",
       "started_at": 1783124409.1450212,
@@ -99,6 +102,14 @@
       "lease_id": "52d0f6a9-f6d",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/tests/test_shared.py"
+    },
+    "548a566d-fb8": {
+      "acquired_at": 1783125691.5162196,
+      "expires_at": 1783126291.5162196,
+      "holder": "main",
+      "lease_id": "548a566d-fb8",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/precompact/__init__.py"
     },
     "56bffde9-27a": {
       "acquired_at": 1783124911.3475435,
@@ -172,13 +183,29 @@
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/__init__.py"
     },
+    "b6106a3f-06c": {
+      "acquired_at": 1783125716.9440076,
+      "expires_at": 1783126466.7375262,
+      "holder": "main",
+      "lease_id": "b6106a3f-06c",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/precompact/command.py"
+    },
     "b7c15ba4-3b1": {
       "acquired_at": 1783124669.7592778,
-      "expires_at": 1783126223.83111,
+      "expires_at": 1783126559.327193,
       "holder": "main",
       "lease_id": "b7c15ba4-3b1",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/\""
+    },
+    "b8038cac-e51": {
+      "acquired_at": 1783125922.3692725,
+      "expires_at": 1783126522.3692725,
+      "holder": "main",
+      "lease_id": "b8038cac-e51",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_precompact.py"
     },
     "b87de49c-f68": {
       "acquired_at": 1783125378.5907295,
