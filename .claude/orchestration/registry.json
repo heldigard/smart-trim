@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783124669.7592778,
+      "last_seen": 1783125378.654985,
       "leased_paths": [
         "/home/eldi/smart-trim/src/smart_trim/shared/config.py",
         "/home/eldi/smart-trim/src/smart_trim/shared/compat.py",
@@ -12,7 +12,24 @@
         "/home/eldi/smart-trim/src/smart_trim/shared/__init__.py",
         "/home/eldi/smart-trim/tests/conftest.py",
         "/home/eldi/smart-trim/tests/test_shared.py",
-        "\""
+        "\"",
+        "/home/eldi/smart-trim/src/smart_trim/features/session/__init__.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/session/command.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/fallback/__init__.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/fallback/command.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/summarize/__init__.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/summarize/command.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/hygiene/__init__.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/hygiene/command.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/__init__.py",
+        "maxd:",
+        "3:",
+        "3",
+        "/home/eldi/smart-trim/tests/test_session.py",
+        "/home/eldi/smart-trim/tests/test_fallback.py",
+        "/home/eldi/smart-trim/tests/test_summarize.py",
+        "/home/eldi/smart-trim/tests/test_hygiene.py",
+        "cloud"
       ],
       "model": "unknown",
       "started_at": 1783124409.1450212,
@@ -21,6 +38,30 @@
     }
   },
   "leases": {
+    "1845be58-054": {
+      "acquired_at": 1783125270.2531161,
+      "expires_at": 1783125870.2531161,
+      "holder": "main",
+      "lease_id": "1845be58-054",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_summarize.py"
+    },
+    "232fea05-ef6": {
+      "acquired_at": 1783125279.2112389,
+      "expires_at": 1783125976.067058,
+      "holder": "main",
+      "lease_id": "232fea05-ef6",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_hygiene.py"
+    },
+    "265f19be-253": {
+      "acquired_at": 1783124747.8902817,
+      "expires_at": 1783125347.8902817,
+      "holder": "main",
+      "lease_id": "265f19be-253",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/hygiene/__init__.py"
+    },
     "29947934-dac": {
       "acquired_at": 1783124409.1450212,
       "expires_at": 1783125009.1450212,
@@ -28,6 +69,14 @@
       "lease_id": "29947934-dac",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/shared/config.py"
+    },
+    "3705f0b5-c85": {
+      "acquired_at": 1783124751.509707,
+      "expires_at": 1783125351.509707,
+      "holder": "main",
+      "lease_id": "3705f0b5-c85",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/__init__.py"
     },
     "52d0f6a9-f6d": {
       "acquired_at": 1783124617.974049,
@@ -37,6 +86,30 @@
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/tests/test_shared.py"
     },
+    "56bffde9-27a": {
+      "acquired_at": 1783124911.3475435,
+      "expires_at": 1783125759.3413908,
+      "holder": "main",
+      "lease_id": "56bffde9-27a",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/3:"
+    },
+    "781315e3-c13": {
+      "acquired_at": 1783124751.183887,
+      "expires_at": 1783125934.1818194,
+      "holder": "main",
+      "lease_id": "781315e3-c13",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/hygiene/command.py"
+    },
+    "8acff8cf-377": {
+      "acquired_at": 1783124728.8825355,
+      "expires_at": 1783125328.8825355,
+      "holder": "main",
+      "lease_id": "8acff8cf-377",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/summarize/__init__.py"
+    },
     "915256fd-2c0": {
       "acquired_at": 1783124434.1443763,
       "expires_at": 1783125034.1443763,
@@ -44,6 +117,22 @@
       "lease_id": "915256fd-2c0",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/shared/timeutil.py"
+    },
+    "99275bc8-e0b": {
+      "acquired_at": 1783124720.3227444,
+      "expires_at": 1783125796.7072046,
+      "holder": "main",
+      "lease_id": "99275bc8-e0b",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/session/command.py"
+    },
+    "ae598028-a58": {
+      "acquired_at": 1783125159.2772696,
+      "expires_at": 1783125759.2772696,
+      "holder": "main",
+      "lease_id": "ae598028-a58",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/3"
     },
     "aedb4b72-c7a": {
       "acquired_at": 1783124437.9239311,
@@ -55,11 +144,19 @@
     },
     "b7c15ba4-3b1": {
       "acquired_at": 1783124669.7592778,
-      "expires_at": 1783125269.7592778,
+      "expires_at": 1783125978.654985,
       "holder": "main",
       "lease_id": "b7c15ba4-3b1",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/\""
+    },
+    "b87de49c-f68": {
+      "acquired_at": 1783125378.5907295,
+      "expires_at": 1783125978.5907295,
+      "holder": "main",
+      "lease_id": "b87de49c-f68",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/cloud"
     },
     "c2a209d8-38d": {
       "acquired_at": 1783124429.6980677,
@@ -77,6 +174,38 @@
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/shared/paths.py"
     },
+    "d227f5f7-a19": {
+      "acquired_at": 1783125245.8033447,
+      "expires_at": 1783125845.8033447,
+      "holder": "main",
+      "lease_id": "d227f5f7-a19",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_session.py"
+    },
+    "d5c33c1b-d84": {
+      "acquired_at": 1783124745.4404235,
+      "expires_at": 1783125345.4404235,
+      "holder": "main",
+      "lease_id": "d5c33c1b-d84",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/summarize/command.py"
+    },
+    "dc9e485e-289": {
+      "acquired_at": 1783124727.539611,
+      "expires_at": 1783125715.0484295,
+      "holder": "main",
+      "lease_id": "dc9e485e-289",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/fallback/command.py"
+    },
+    "e0a77fba-a9b": {
+      "acquired_at": 1783125256.2816842,
+      "expires_at": 1783125856.2816842,
+      "holder": "main",
+      "lease_id": "e0a77fba-a9b",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_fallback.py"
+    },
     "f3c20bb2-e28": {
       "acquired_at": 1783124601.1579347,
       "expires_at": 1783125201.1579347,
@@ -93,6 +222,22 @@
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/shared/__init__.py"
     },
+    "f5b2c2c5-69b": {
+      "acquired_at": 1783124696.3051176,
+      "expires_at": 1783125296.3051176,
+      "holder": "main",
+      "lease_id": "f5b2c2c5-69b",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/session/__init__.py"
+    },
+    "f807393d-f9d": {
+      "acquired_at": 1783124721.8647094,
+      "expires_at": 1783125321.8647094,
+      "holder": "main",
+      "lease_id": "f807393d-f9d",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/fallback/__init__.py"
+    },
     "fd2b335c-43a": {
       "acquired_at": 1783124417.407774,
       "expires_at": 1783125129.8203719,
@@ -100,6 +245,14 @@
       "lease_id": "fd2b335c-43a",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/shared/compat.py"
+    },
+    "fde3a5a5-d50": {
+      "acquired_at": 1783124911.2789934,
+      "expires_at": 1783125511.2789934,
+      "holder": "main",
+      "lease_id": "fde3a5a5-d50",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/maxd:"
     }
   },
   "started_at": 1783124409.1450202,
