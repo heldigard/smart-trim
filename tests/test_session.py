@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from smart_trim.features.session import command as session
+from smart_trim.features.session import content
 
 
 # --- get_session_id ----------------------------------------------------------
@@ -71,12 +72,12 @@ def test_read_session_missing_file_returns_empty(tmp_path):
 
 
 def test_extract_text_string_capped():
-    out = session._extract_text_from_content("x" * 5000, "user")
+    out = content._extract_text_from_content("x" * 5000, "user")
     assert len(out) == 1200
 
 
 def test_extract_text_assistant_smaller_cap():
-    out = session._extract_text_from_content("x" * 5000, "assistant")
+    out = content._extract_text_from_content("x" * 5000, "assistant")
     assert len(out) == 1000
 
 
@@ -88,7 +89,7 @@ def test_extract_text_list_with_blocks():
         {"type": "tool_result", "content": "ok"},
         {"type": "tool_result", "is_error": True, "content": "boom"},
     ]
-    out = session._extract_text_from_content(blocks, "assistant")
+    out = content._extract_text_from_content(blocks, "assistant")
     assert "hello" in out
     assert "[Tool: Read(" in out
     assert "[Result: ok]" in out
@@ -97,7 +98,7 @@ def test_extract_text_list_with_blocks():
 
 
 def test_extract_text_dict_content():
-    out = session._extract_text_from_content({"k": "v"}, "user")
+    out = content._extract_text_from_content({"k": "v"}, "user")
     assert "k" in out and "v" in out
 
 

@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783125959.327193,
+      "last_seen": 1783126602.1868303,
       "leased_paths": [
         "/home/eldi/smart-trim/src/smart_trim/shared/config.py",
         "/home/eldi/smart-trim/src/smart_trim/shared/compat.py",
@@ -38,7 +38,9 @@
         "/home/eldi/smart-trim/tests/test_writer.py",
         "/home/eldi/smart-trim/src/smart_trim/features/precompact/__init__.py",
         "/home/eldi/smart-trim/src/smart_trim/features/precompact/command.py",
-        "/home/eldi/smart-trim/tests/test_precompact.py"
+        "/home/eldi/smart-trim/tests/test_precompact.py",
+        "/home/eldi/smart-trim/src/smart_trim/features/session/content.py",
+        "/home/eldi/smart-trim/tests/test_layout.py"
       ],
       "model": "unknown",
       "started_at": 1783124409.1450212,
@@ -95,6 +97,14 @@
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/src/smart_trim/features/__init__.py"
     },
+    "3f660d05-b3a": {
+      "acquired_at": 1783126490.167278,
+      "expires_at": 1783127090.167278,
+      "holder": "main",
+      "lease_id": "3f660d05-b3a",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/src/smart_trim/features/session/content.py"
+    },
     "52d0f6a9-f6d": {
       "acquired_at": 1783124617.974049,
       "expires_at": 1783125237.629274,
@@ -118,6 +128,14 @@
       "lease_id": "56bffde9-27a",
       "mode": "exclusive",
       "path": "/home/eldi/smart-trim/3:"
+    },
+    "591dbed9-ceb": {
+      "acquired_at": 1783126602.1868303,
+      "expires_at": 1783127202.1868303,
+      "holder": "main",
+      "lease_id": "591dbed9-ceb",
+      "mode": "exclusive",
+      "path": "/home/eldi/smart-trim/tests/test_layout.py"
     },
     "6e2a9f2f-ee2": {
       "acquired_at": 1783125464.7481756,
@@ -153,7 +171,7 @@
     },
     "99275bc8-e0b": {
       "acquired_at": 1783124720.3227444,
-      "expires_at": 1783125796.7072046,
+      "expires_at": 1783127143.3963287,
       "holder": "main",
       "lease_id": "99275bc8-e0b",
       "mode": "exclusive",
@@ -241,7 +259,7 @@
     },
     "d227f5f7-a19": {
       "acquired_at": 1783125245.8033447,
-      "expires_at": 1783125845.8033447,
+      "expires_at": 1783127173.0360312,
       "holder": "main",
       "lease_id": "d227f5f7-a19",
       "mode": "exclusive",

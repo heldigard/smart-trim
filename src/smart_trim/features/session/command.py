@@ -1,13 +1,12 @@
-"""Discover the active Claude Code session and extract conversation context.
+"""Discover the active Claude Code session and read its JSONL messages.
 
 Resolution order for the session file:
   1. ``CLAUDE_SESSION_FILE`` env var (SessionStart hooks)
   2. Build from ``sessionId`` + ``cwd`` in the stdin JSON (PreCompact fallback)
   3. Most recent JSONL across all projects (last resort)
 
-Context extraction walks the JSONL newest-first, unwraps the ``message``
-envelope, keeps user/assistant text + terse tool-result lines, and caps total
-length so the local LLM stays within VRAM/ctx budget.
+Content *extraction* (shaping messages for the LLM) lives in ``content.py`` — a
+distinct sub-responsibility, kept separate so discovery stays small.
 """
 from __future__ import annotations
 
@@ -16,7 +15,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from smart_trim.shared.config import MAX_CONTEXT_FOR_SUMMARY
+# Re-exported for API stability: precompact reaches it as _session.extract...,
+# and tests import it from the session package. The implementation lives in
+# content.py (extraction is a separate responsibility from discovery).
+from smart_trim.features.session.content import extract_context_for_summary
 
 
 def find_latest_session_jsonl() -> Path | None:
@@ -151,114 +153,6 @@ def _parse_jsonl_line(line: str) -> dict[str, Any] | None:
         return json.loads(line)
     except json.JSONDecodeError:
         return None
-
-
-def extract_context_for_summary(
-    messages: list[dict[str, Any]], max_length: int = MAX_CONTEXT_FOR_SUMMARY
-) -> str:
-    """Extract conversation context for LLM summarization.
-
-    Prioritizes user messages, assistant text, tool calls. Handles Claude Code
-    JSONL where messages are nested in a 'message' key. Walks newest-first and
-    stops once ``max_length`` chars are accumulated.
-    """
-    context_parts: list[str] = []
-    total_length = 0
-
-    for msg in reversed(messages):
-        # Skip non-conversation lines (last-prompt, mode, permission-mode, attachment)
-        msg_type = msg.get("type", "")
-        if msg_type in ("last-prompt", "mode", "permission-mode", "attachment"):
-            continue
-
-        # Unwrap 'message' envelope (Claude Code JSONL format)
-        inner = msg.get("message", msg)
-        if not isinstance(inner, dict):
-            continue
-
-        role = inner.get("role", "")
-        if role not in ("user", "assistant"):
-            continue
-
-        content = inner.get("content", "")
-        text = _extract_text_from_content(content, role)
-        if not text:
-            continue
-
-        part = f"[{role.upper()}]: {text}"
-        part_len = len(part)
-
-        if total_length + part_len > max_length:
-            break
-
-        context_parts.insert(0, part)
-        total_length += part_len
-
-    return "\n\n".join(context_parts)
-
-
-def _extract_text_from_content(content: Any, role: str) -> str:
-    """Extract readable text from Claude Code content field."""
-    # Slightly larger caps for the actual conversation; tool results stay terse
-    # unless they contain an error, in which case we keep more context.
-    text_cap = 1200 if role == "user" else 1000
-    result_cap = 300
-
-    if isinstance(content, str):
-        return content[:text_cap]
-    if isinstance(content, list):
-        parts = _extract_from_blocks(content, text_cap, result_cap)
-        return " ".join(parts)[:text_cap]
-    if isinstance(content, dict):
-        return json.dumps(content, ensure_ascii=False)[:500]
-    return str(content)[:500]
-
-
-def _extract_from_blocks(
-    blocks: list[Any], text_cap: int, result_cap: int
-) -> list[str]:
-    """Flatten a content-block list into text fragments (thinking blocks skipped)."""
-    parts: list[str] = []
-    for block in blocks:
-        if not isinstance(block, dict):
-            continue
-        parts.extend(_extract_from_block(block, text_cap, result_cap))
-    return parts
-
-
-def _extract_from_block(block: dict[str, Any], text_cap: int, result_cap: int) -> list[str]:
-    """Extract text from a single content block by its type."""
-    btype = block.get("type", "")
-    if btype == "text":
-        return [block.get("text", "")[:text_cap]]
-    if btype == "tool_use":
-        name = block.get("name", "unknown")
-        inp = json.dumps(block.get("input", {}), ensure_ascii=False)[:200]
-        return [f"[Tool: {name}({inp})]"]
-    if btype == "tool_result":
-        return _extract_from_result(block, result_cap)
-    # thinking / unknown -> skipped (too verbose for summary)
-    return []
-
-
-def _extract_from_result(block: dict[str, Any], result_cap: int) -> list[str]:
-    """Extract text from a tool_result block (errors get a larger cap)."""
-    is_error = bool(block.get("is_error") or block.get("error"))
-    cap = 600 if is_error else result_cap
-    rc = block.get("content", "")
-    if isinstance(rc, list):
-        return _extract_from_result_list(rc, cap)
-    if isinstance(rc, str):
-        return [f"[Result: {rc[:cap]}]"]
-    return []
-
-
-def _extract_from_result_list(items: list[Any], cap: int) -> list[str]:
-    parts: list[str] = []
-    for item in items:
-        if isinstance(item, dict) and item.get("type") == "text":
-            parts.append(f"[Result: {item.get('text', '')[:cap]}]")
-    return parts
 
 
 __all__ = [
