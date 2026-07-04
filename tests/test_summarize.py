@@ -76,18 +76,18 @@ def test_summarize_ollama_swallows_unavailable(monkeypatch):
 # --- summarize_primary / secondary ------------------------------------------
 
 
-def test_summarize_primary_uses_qwen_model(monkeypatch):
+def test_summarize_primary_uses_setneuf_model(monkeypatch):
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_primary("ctx")
-    assert fake.calls[0]["model"] == "qwen3.5:4b"
+    assert "Qwopus" in fake.calls[0]["model"]
 
 
-def test_summarize_secondary_uses_qwopus_model(monkeypatch):
+def test_summarize_secondary_uses_qwen_model(monkeypatch):
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_secondary("ctx")
-    assert "Qwopus" in fake.calls[0]["model"]
+    assert fake.calls[0]["model"] == "qwen3.5:4b"
 
 
 # --- summarize_cloud_cascade ------------------------------------------------

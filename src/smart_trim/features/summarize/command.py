@@ -1,8 +1,8 @@
 """LLM summarization cascade (quality-ordered, privacy-first).
 
 Chain:
-  1. Ollama qwen3.5:4b (LOCAL, ~5s, free) — PRIMARY
-  2. Ollama SetneufPT/Qwopus3.5-4B-Coder-MTP (LOCAL, ~3s) — SECONDARY
+  1. Ollama SetneufPT/Qwopus3.5-4B-Coder-MTP (LOCAL, ~3s) — PRIMARY (smart_trim combined #1, re-bench 2026-07-04)
+  2. Ollama qwen3.5:4b (LOCAL, ~5s, universal anchor) — SECONDARY
   3. cheap_llm cascade -> DeepSeek (CLOUD, secret-scrubbed) — TERTIARY
 
 Each tier returns ``None`` on failure so the caller falls through. Cloud tier
@@ -20,10 +20,14 @@ _SYSTEM_PROMPT = (
     "Use the provided TASK/PROGRESS grounding to keep focus. Discard filler."
 )
 
-_PRIMARY_MODEL = os.environ.get("SMART_TRIM_PRIMARY_MODEL", "qwen3.5:4b")
-_SECONDARY_MODEL = os.environ.get(
-    "SMART_TRIM_SECONDARY_MODEL", "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU"
+# Re-bench 2026-07-04 (Ollama 0.31.1): SetneufPT/Qwopus3.5-4B-Coder-MTP is
+# smart_trim combined #1 (deep 7.00 + tie-break 10.50 — perfect; 174 tok/s,
+# 2.8GB VRAM, no think-leak). qwen3.5:4b (was PRIMARY) is the universal anchor
+# — always installed, clean output — so it stays as the always-available fallback.
+_PRIMARY_MODEL = os.environ.get(
+    "SMART_TRIM_PRIMARY_MODEL", "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU"
 )
+_SECONDARY_MODEL = os.environ.get("SMART_TRIM_SECONDARY_MODEL", "qwen3.5:4b")
 
 
 def get_summary_prompt(context: str, grounding: str = "") -> str:
@@ -82,18 +86,21 @@ def summarize_ollama(context: str, model: str, grounding: str = "") -> str | Non
 
 
 def summarize_primary(context: str, grounding: str = "") -> str | None:
-    """PRIMARY: Ollama qwen3.5:4b (clean handoffs, ~5s, 3.4GB VRAM).
+    """PRIMARY: Ollama SetneufPT/Qwopus3.5-4B-Coder-MTP (smart_trim combined #1,
+    re-bench 2026-07-04: deep 7.00 + tie-break 10.50 — perfect; longctx/reason
+    winner 2026-06-28: 9/10 facts, 174 tok/s, 2.8GB VRAM, no think-leak).
 
     carstenuhlig/omnicoder-9b demoted 2026-06-27: reasoning model that burns its
     token budget on a 'Thinking Process:' preamble (think=False) or returns EMPTY
-    (think=True). qwen3.5:4b matches its compact quality with CLEAN direct output.
+    (think=True). qwen3.5:4b (the prior PRIMARY) is now the universal-anchor
+    SECONDARY — slightly lower smart_trim rank, but always installed + clean.
     """
     return summarize_ollama(context, _PRIMARY_MODEL, grounding=grounding)
 
 
 def summarize_secondary(context: str, grounding: str = "") -> str | None:
-    """SECONDARY: Ollama Qwopus3.5-4B-Coder-MTP (longctx/reason winner 2026-06-28:
-    longctx 9/10 facts, reason 1.0, 174 tok/s, 2.8GB VRAM, no think-leak)."""
+    """SECONDARY: Ollama qwen3.5:4b (universal clean anchor, ~5s, 3.4GB VRAM) —
+    always-installed fallback when the SetneufPT tag is missing or fails."""
     return summarize_ollama(context, _SECONDARY_MODEL, grounding=grounding)
 
 

@@ -139,7 +139,7 @@ def test_primary_method_label(tmp_path, monkeypatch):
     )
 
     assert result["continue"] is True
-    assert seen["method"] == "ollama-qwen3.5:4b"
+    assert seen["method"] == "ollama-setneuf-qwopus3.5"
     assert seen["project_root"] == str(project)
 
 
@@ -286,7 +286,7 @@ def test_precompact_secondary_ollama_success(tmp_path, monkeypatch):
 
     text, method = precompact._try_local("context", "grounding")
     assert text == "secondary ok"
-    assert method == "ollama-setneuf-qwopus3.5"
+    assert method == "ollama-qwen3.5:4b"
 
 
 def test_precompact_archive_summary(tmp_path, monkeypatch):

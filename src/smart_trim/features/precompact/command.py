@@ -146,10 +146,12 @@ def _try_local(context: str, summary_grounding: str) -> tuple[str | None, str | 
         return None, None
     text = _summarize.summarize_primary(context, grounding=summary_grounding)
     if text:
-        return text, "ollama-qwen3.5:4b"
+        # label must track summarize._PRIMARY_MODEL (SetneufPT/Qwopus3.5-4B-Coder-MTP)
+        return text, "ollama-setneuf-qwopus3.5"
     text = _summarize.summarize_secondary(context, grounding=summary_grounding)
     if text:
-        return text, "ollama-setneuf-qwopus3.5"
+        # label must track summarize._SECONDARY_MODEL (qwen3.5:4b)
+        return text, "ollama-qwen3.5:4b"
     return None, None
 
 
