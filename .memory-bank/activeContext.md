@@ -1,8 +1,12 @@
 # Active Context
-- 2026-07-03: Smart trim summary (minimal).
+- 2026-07-04: Smart trim summary (minimal).
 - ## Preserved Negative Constraints
 - - post_json` helper: dropped (dead code — defined in v3.2 but never called; summarize uses ollama_client.chat / cheap_complete).
-- **Task**: Session smoke compacted (manual)
+- - n v3.2 but never called; summarize uses ollama_client.chat / cheap_complete).
+- - 1. DO NOT re-read files you already know from this summary
+- - 2. DO NOT read screenshots/images into context
+- - 4. DO NOT re-read rules files — they are already loaded
+- **Task**: Session verify-smoke compacted (manual)
 - **Notes**: No session JSONL available; using minimal handoff.
 - **Next**: Reload from project memory bank if needed.
 - ---
