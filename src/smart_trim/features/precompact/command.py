@@ -57,9 +57,7 @@ def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
     grounding, objective_block = _build_grounding(project_root)
     session_id = _session.get_session_id(input_data)
 
-    summary_text, method, preserved = _resolve_summary(
-        session_file, grounding, session_id, trigger
-    )
+    summary_text, method, preserved = _resolve_summary(session_file, grounding, session_id, trigger)
     summary_text = _augment(summary_text, preserved, objective_block)
 
     _archive_summary(summary_text, method, trigger, session_id)

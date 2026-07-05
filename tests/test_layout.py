@@ -97,6 +97,5 @@ def test_live_shim_matches_canonical():
     canonical = _CANONICAL_SHIM.read_text(encoding="utf-8")
     live = _LIVE_SHIM.read_text(encoding="utf-8")
     assert canonical == live, (
-        f"live shim drifted from canonical. Re-sync:\n"
-        f"  ln -sfn {_CANONICAL_SHIM} {_LIVE_SHIM}"
+        f"live shim drifted from canonical. Re-sync:\n  ln -sfn {_CANONICAL_SHIM} {_LIVE_SHIM}"
     )
