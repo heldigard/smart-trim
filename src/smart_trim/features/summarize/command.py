@@ -12,7 +12,7 @@ only runs when both local tiers are down — keeps most summaries on-machine.
 import os
 
 from smart_trim.shared import compat
-from smart_trim.shared.config import OLLAMA_BASE
+from smart_trim.shared.config import OLLAMA_BASE, OLLAMA_TIMEOUT_SECONDS
 
 _SYSTEM_PROMPT = (
     "You are a context compression expert. Max 280 words. "
@@ -80,6 +80,7 @@ def summarize_ollama(context: str, model: str, grounding: str = "") -> str | Non
             base_url=OLLAMA_BASE,
             cache=False,
             num_ctx=32768,
+            timeout=OLLAMA_TIMEOUT_SECONDS,
         )
     except compat.ollama_client.OllamaUnavailable:
         return None
