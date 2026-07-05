@@ -58,7 +58,7 @@ def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
     session_id = _session.get_session_id(input_data)
 
     summary_text, method, preserved = _resolve_summary(
-        session_file, grounding, objective_block, session_id, trigger
+        session_file, grounding, session_id, trigger
     )
     summary_text = _augment(summary_text, preserved, objective_block)
 
@@ -94,18 +94,16 @@ def _build_grounding(project_root: Path) -> tuple[str, str]:
 def _resolve_summary(
     session_file: Path | None,
     grounding: str,
-    objective_block: str,
     session_id: str,
     trigger: str,
 ) -> tuple[str, str, str]:
     """Run the LLM cascade when there is a session, else minimal handoff.
 
-    Returns (summary_text, method, preserved_constraints). ``objective_block`` is
-    carried through to ``_augment`` via the caller; it is not needed for cascade
-    selection, so it is unused here but kept on the signature for symmetry with
-    the public pipeline shape.
+    Returns ``(summary_text, method, preserved_constraints)``. The cascade
+    selection only needs ``grounding`` (for negative-constraint extraction);
+    ``objective_block`` is carried separately by ``handle_precompact`` and
+    merged into the output by ``_augment``.
     """
-    del objective_block  # carried via handle_precompact -> _augment
     preserved = _grounding.extract_negative_constraints(grounding)
     if not (session_file and session_file.exists()):
         return _minimal_handoff(session_id, trigger), "minimal", preserved

@@ -270,7 +270,7 @@ def test_precompact_minimal_handoff_empty_messages(tmp_path, monkeypatch):
     monkeypatch.setattr(precompact._grounding, "extract_negative_constraints", lambda g: "")
 
     text, method, preserved = precompact._resolve_summary(
-        session_file, grounding="", objective_block="", session_id="s", trigger="auto"
+        session_file, grounding="", session_id="s", trigger="auto"
     )
     assert method == "minimal"
 
