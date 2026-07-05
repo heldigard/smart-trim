@@ -26,6 +26,10 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "mypy>=1.10"]
+
+# `test` is the CI gate; `dev` adds mypy so a contributor who wants to
+# validate types locally doesn't have to install it separately.
 
 # NOTE: no [project.scripts] — smart-trim is a HOOK invoked as
 # `python3 ~/.claude/hooks/smart-trim.py` (a thin shim that imports this
