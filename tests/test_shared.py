@@ -227,6 +227,21 @@ def test_git_toplevel_success(monkeypatch, tmp_path):
     assert paths._git_toplevel(tmp_path) == tmp_path.resolve()
 
 
+def test_bank_ancestor_returns_none_when_root_reached(monkeypatch):
+    # No .memory-bank anywhere; _bank_ancestor must walk to the filesystem root
+    # and break via `parent == parent.parent` (covers the root-parent guard at
+    # paths.py:46-47). _has_memory_bank monkeypatched to always return False so
+    # we exercise the break branch on a synthetic tree, not the real FS.
+    monkeypatch.setattr(paths, "_has_memory_bank", lambda _p: False)
+    fake = Path("/tmp/fake-deep/inner/leaf")
+    assert paths._bank_ancestor(fake) is None
+
+
+def test_bank_ancestor_returns_root_when_root_has_bank(monkeypatch):
+    monkeypatch.setattr(paths, "_has_memory_bank", lambda p: p == Path("/"))
+    assert paths._bank_ancestor(Path("/tmp/somewhere")) == Path("/")
+
+
 def test_get_project_root_resolve_error(monkeypatch):
     from pathlib import Path
 
