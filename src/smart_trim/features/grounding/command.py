@@ -178,6 +178,12 @@ def _render_objective(data: dict[str, Any]) -> str:
 
 
 def _same_or_nested_project(recorded_root: str, project_root: Path) -> bool:
+    """True when ``current`` equals ``recorded_root`` or is nested under it.
+
+    Worktree sessions (cwd in a subdirectory of the original project) must still
+    see the shared objective — the previous equality-only check silently dropped
+    those and forced the agent to re-discover context after every compact.
+    """
     if not recorded_root:
         return False
     try:
@@ -185,7 +191,12 @@ def _same_or_nested_project(recorded_root: str, project_root: Path) -> bool:
         current = project_root.expanduser().resolve()
     except (OSError, ValueError):
         return False
-    return recorded == current
+    # ``relative_to`` succeeds iff ``current`` is ``recorded`` or nested under it.
+    try:
+        current.relative_to(recorded)
+        return True
+    except ValueError:
+        return False
 
 
 __all__ = [

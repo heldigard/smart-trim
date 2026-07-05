@@ -12,8 +12,8 @@ the always-succeeds fallback.
 
 ## Fallback chain (quality-optimized)
 
-1. Ollama `qwen3.5:4b` (local, ~5s) — PRIMARY
-2. Ollama `SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU` (local, ~3s) — SECONDARY
+1. Ollama `SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU` (local, ~3s) — PRIMARY (`SMART_TRIM_PRIMARY_MODEL`)
+2. Ollama `qwen3.5:4b` (local, ~5s, universal anchor) — SECONDARY (`SMART_TRIM_SECONDARY_MODEL`)
 3. `cheap_llm` cascade → DeepSeek (cloud, secret-scrubbed) — TERTIARY
 4. Rule-based extraction (deterministic, ~0s) — FALLBACK
 

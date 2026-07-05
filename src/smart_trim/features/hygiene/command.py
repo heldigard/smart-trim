@@ -4,17 +4,21 @@
 so the post-write state equals ``max_files`` rather than ``max_files + 1``).
 ``check_memory_hygiene`` surfaces a warning only when that rotation is clearly
 not keeping up (count > max_files), avoiding a permanent inactionable nag.
+
+The archive directory itself lives in ``shared.paths.default_summaries_dir`` so
+the writer (``precompact``) and the rotator (``hygiene``) cannot disagree on
+the location — drift here would silently break the rotation invariant.
 """
 
 from __future__ import annotations
 
-import sys
+import logging
 from datetime import datetime
 from pathlib import Path
 
+from smart_trim.shared.paths import default_summaries_dir
 
-def _default_summary_dir() -> Path:
-    return Path.home() / ".claude" / "summaries"
+_log = logging.getLogger("smart_trim.hygiene")
 
 
 def cleanup_old_summaries(
@@ -23,9 +27,9 @@ def cleanup_old_summaries(
     """Remove summaries older than max_age_days. Keep at most max_files.
 
     ``summary_dir`` is injectable for tests; production callers leave it None so
-    the real ``~/.claude/summaries`` is used.
+    the canonical archive directory is used.
     """
-    summary_dir = summary_dir if summary_dir is not None else _default_summary_dir()
+    summary_dir = summary_dir if summary_dir is not None else default_summaries_dir()
     try:
         if not summary_dir.is_dir():
             return
@@ -33,8 +37,7 @@ def cleanup_old_summaries(
         removed = _remove_aged(summary_dir, cutoff)
         removed += _enforce_cap(summary_dir, max_files)
         if removed:
-            # Log to stderr for debug visibility
-            print(f"[smart-trim] cleaned {removed} old summaries", file=sys.stderr)
+            _log.info("cleaned %d old summaries", removed)
     except Exception:
         pass
 
@@ -76,7 +79,7 @@ def _safe_unlink(f: Path) -> bool:
 
 def check_memory_hygiene(max_files: int = 150, summary_dir: Path | None = None) -> str | None:
     """Check if summaries directory is getting large."""
-    summary_dir = summary_dir if summary_dir is not None else _default_summary_dir()
+    summary_dir = summary_dir if summary_dir is not None else default_summaries_dir()
     try:
         if not summary_dir.exists():
             return None

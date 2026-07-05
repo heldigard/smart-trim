@@ -105,6 +105,42 @@ def summarize_secondary(context: str, grounding: str = "") -> str | None:
     return summarize_ollama(context, _SECONDARY_MODEL, grounding=grounding)
 
 
+def primary_label() -> str:
+    """Stable, env-aware label for the PRIMARY tier (drives the `method` field).
+
+    Derived from ``_PRIMARY_MODEL`` so an env override changes the label
+    alongside the model, keeping ``.memory-bank/activeContext.md`` truthful.
+    Quantization suffixes (``_Q4_..._8GB-GPU`` etc.) are stripped — they
+    encode VRAM hints, not identity.
+    """
+    return f"ollama-{_normalize_model_for_label(_PRIMARY_MODEL)}"
+
+
+def secondary_label() -> str:
+    """Stable, env-aware label for the SECONDARY tier (drives the `method` field)."""
+    return f"ollama-{_normalize_model_for_label(_SECONDARY_MODEL)}"
+
+
+# Quantization / VRAM-hint suffixes that vary per-host and must NOT appear in
+# the persisted method label (they identify the *host*, not the *model*).
+_QUANT_SUFFIXES = (
+    "_Q4_64k_8GB-GPU",
+    "_Q4_K_M",
+    "_Q4_K_S",
+    "_Q5_K_M",
+    "_Q8_0",
+    "_Q4_0",
+)
+
+
+def _normalize_model_for_label(model: str) -> str:
+    """Strip a trailing quantization suffix; return the bare model tag."""
+    for suffix in _QUANT_SUFFIXES:
+        if model.endswith(suffix):
+            return model[: -len(suffix)]
+    return model
+
+
 def summarize_cloud_cascade(context: str, grounding: str = "") -> str | None:
     """TERTIARY: cheap_llm cloud cascade (secret-scrubbed, cross-provider failover).
 
@@ -139,4 +175,6 @@ __all__ = [
     "summarize_primary",
     "summarize_secondary",
     "summarize_cloud_cascade",
+    "primary_label",
+    "secondary_label",
 ]

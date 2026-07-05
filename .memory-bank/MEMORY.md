@@ -5,5 +5,8 @@
   `smart-trim.py.pre-split.bak` (root of this repo).
 - The hook is a PreCompact event handler, NOT a CLI. Entry = thin shim at
   `~/.claude/hooks/smart-trim.py` → `smart_trim.features.precompact.command:main`.
-- Output must stay byte-identical to v3.2 for the same input — the split is pure
-  reorganization. Any behavior change belongs in a separate commit + version bump.
+- 2026-07-05 audit: 4 real bugs + DRY refactor landed (label derivation,
+  nested-project match, shared archive dir, hygiene logging). The
+  byte-identical-to-v3.2 contract no longer holds for the persisted
+  `method` label — the audit intentionally made it env-aware. Behavior
+  change lives in this commit; no version bump (no user-visible API change).

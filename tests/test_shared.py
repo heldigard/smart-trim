@@ -85,6 +85,12 @@ def test_slugify_empty_falls_back_to_default():
     assert paths.slugify("!!!") == "session-handoffs"
 
 
+def test_default_summaries_dir_is_claude_summaries(monkeypatch, tmp_path):
+    """Canonical archive location — shared by hygiene + precompact."""
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    assert paths.default_summaries_dir() == tmp_path / ".claude" / "summaries"
+
+
 # --- is_ollama_alive (cached TCP probe) --------------------------------------
 
 

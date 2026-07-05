@@ -162,3 +162,54 @@ def test_summarize_model_env_overrides(monkeypatch):
     monkeypatch.delenv("SMART_TRIM_PRIMARY_MODEL", raising=False)
     monkeypatch.delenv("SMART_TRIM_SECONDARY_MODEL", raising=False)
     importlib.reload(sum_cmd)
+
+
+# --- label derivation (tracks env override; strips quant suffix) ------------
+
+
+def test_primary_label_strips_quantization_suffix():
+    # Default model carries the Q4_64k_8GB-GPU VRAM hint — strip it for label.
+    from smart_trim.features.summarize import command as sum_cmd
+
+    label = sum_cmd.primary_label()
+    assert label.startswith("ollama-")
+    assert "_Q4_64k_8GB-GPU" not in label
+    # Must end with the bare model identity (case preserved).
+    assert label == "ollama-SetneufPT/Qwopus3.5-4B-Coder-MTP"
+
+
+def test_secondary_label_uses_bare_tag():
+    from smart_trim.features.summarize import command as sum_cmd
+
+    assert sum_cmd.secondary_label() == "ollama-qwen3.5:4b"
+
+
+def test_labels_track_env_override(monkeypatch):
+    """The whole point of label derivation: env override MUST change the label."""
+    import importlib
+
+    from smart_trim.features.summarize import command as sum_cmd
+
+    monkeypatch.setenv("SMART_TRIM_PRIMARY_MODEL", "custom/cool-model-9b_Q4_K_M")
+    importlib.reload(sum_cmd)
+    try:
+        # _Q4_K_M is a known quant suffix -> stripped, vendor prefix preserved.
+        assert sum_cmd.primary_label() == "ollama-custom/cool-model-9b"
+    finally:
+        monkeypatch.delenv("SMART_TRIM_PRIMARY_MODEL", raising=False)
+        importlib.reload(sum_cmd)
+
+
+def test_labels_fall_back_when_no_quant_suffix(monkeypatch):
+    """Plain tags (no quant suffix) pass through verbatim (lower-cased)."""
+    import importlib
+
+    from smart_trim.features.summarize import command as sum_cmd
+
+    monkeypatch.setenv("SMART_TRIM_SECONDARY_MODEL", "org/model-v1")
+    importlib.reload(sum_cmd)
+    try:
+        assert sum_cmd.secondary_label() == "ollama-org/model-v1"
+    finally:
+        monkeypatch.delenv("SMART_TRIM_SECONDARY_MODEL", raising=False)
+        importlib.reload(sum_cmd)

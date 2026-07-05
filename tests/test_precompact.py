@@ -139,7 +139,10 @@ def test_primary_method_label(tmp_path, monkeypatch):
     )
 
     assert result["continue"] is True
-    assert seen["method"] == "ollama-setneuf-qwopus3.5"
+    # Label is derived from the active _PRIMARY_MODEL (env-aware, quant-stripped).
+    from smart_trim.features.summarize import command as summarize_cmd
+
+    assert seen["method"] == summarize_cmd.primary_label()
     assert seen["project_root"] == str(project)
 
 
@@ -286,7 +289,10 @@ def test_precompact_secondary_ollama_success(tmp_path, monkeypatch):
 
     text, method = precompact._try_local("context", "grounding")
     assert text == "secondary ok"
-    assert method == "ollama-qwen3.5:4b"
+    # Label derived from active _SECONDARY_MODEL (env-aware).
+    from smart_trim.features.summarize import command as summarize_cmd
+
+    assert method == summarize_cmd.secondary_label()
 
 
 def test_precompact_archive_summary(tmp_path, monkeypatch):

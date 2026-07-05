@@ -40,3 +40,18 @@ is one end-to-end PreCompact pipeline).
 **Why**:
 Users wanted customization to match their local GPU capacities (VRAM/context window size). Also, some tools return structured dictionary output in `tool_result`, which previously got skipped, causing information loss.
 
+## 2026-07-05 — Audit fixes (4 real bugs + DRY)
+
+**Decision**:
+1. Persisted method labels are now DERIVED from the active model tag (`summarize.primary_label/secondary_label`), not hardcoded — quantization suffixes (`_Q4_64k_8GB-GPU`, `_Q4_K_M`, etc.) are stripped so VRAM hints don't leak into `activeContext.md`.
+2. `_same_or_nested_project` switched from `recorded == current` to `current.relative_to(recorded)`, so worktree sessions (cwd nested in the recorded project root) keep their shared objective injection instead of being silently mis-classified as foreign.
+3. Archive directory consolidated: `shared.paths.default_summaries_dir()` is the single source of truth; both `hygiene.cleanup_old_summaries` and `precompact._archive_summary` resolve through it.
+4. `hygiene` switched from `print(..., file=sys.stderr)` to `logging.getLogger("smart_trim.hygiene")` (named logger; still best-effort / never-block, but routed through the standard logging framework).
+
+**Why**:
+Audit caught: README + `_try_local` disagreed with the actual model order; the env override for the primary/secondary model persisted a STALE label into `activeContext.md` (the bug); the nested-project guard silently dropped worktree sessions; two features held independent copies of the same path (drift risk); and stderr noise bypassed the harness logging conventions.
+
+**Risks mitigated**:
+- Label derivation: tests no longer hard-code the literal method strings; assertions now compare against `primary_label()/secondary_label()`. A future model swap (different default tag) propagates automatically.
+- Nested match: the test suite now covers all three cases (equal, nested, sibling).
+

@@ -137,17 +137,20 @@ def _cascade(
 
 
 def _try_local(context: str, summary_grounding: str) -> tuple[str | None, str | None]:
-    """Ollama primary then secondary. Returns (text, method) or (None, None)."""
+    """Ollama primary then secondary. Returns (text, method) or (None, None).
+
+    The ``method`` label is derived from the active model tag (env-aware), so
+    overrides via ``SMART_TRIM_PRIMARY_MODEL`` / ``SMART_TRIM_SECONDARY_MODEL``
+    keep ``.memory-bank/activeContext.md`` truthful.
+    """
     if not _ollama.is_ollama_alive():
         return None, None
     text = _summarize.summarize_primary(context, grounding=summary_grounding)
     if text:
-        # label must track summarize._PRIMARY_MODEL (SetneufPT/Qwopus3.5-4B-Coder-MTP)
-        return text, "ollama-setneuf-qwopus3.5"
+        return text, _summarize.primary_label()
     text = _summarize.summarize_secondary(context, grounding=summary_grounding)
     if text:
-        # label must track summarize._SECONDARY_MODEL (qwen3.5:4b)
-        return text, "ollama-qwen3.5:4b"
+        return text, _summarize.secondary_label()
     return None, None
 
 
@@ -172,9 +175,14 @@ def _augment(summary_text: str, preserved: str, objective_block: str) -> str:
 
 
 def _archive_summary(summary_text: str, method: str, trigger: str, session_id: str) -> None:
-    """Persist to ~/.claude/summaries/ for archive and ad-hoc retrieval (best-effort)."""
+    """Persist to the canonical archive dir for ad-hoc retrieval (best-effort).
+
+    The directory lives in ``shared.paths.default_summaries_dir`` — the writer
+    (``precompact``) and the rotator (``hygiene``) MUST share the same path,
+    otherwise rotation silently no-ops on the wrong tree.
+    """
     try:
-        summary_dir = Path.home() / ".claude" / "summaries"
+        summary_dir = _paths.default_summaries_dir()
         summary_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         summary_file = summary_dir / f"{session_id}-{timestamp}.md"

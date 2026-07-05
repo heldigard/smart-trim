@@ -312,6 +312,26 @@ def test_same_or_nested_project_errors():
     assert not grounding._same_or_nested_project("", Path("."))
 
 
+def test_same_or_nested_project_nested_current(tmp_path):
+    """Current nested under recorded -> True (worktree / subdir sessions)."""
+    recorded = tmp_path  # /tmp/abc
+    nested = tmp_path / "sub" / "deeper"
+    nested.mkdir(parents=True)
+    assert grounding._same_or_nested_project(str(recorded), nested) is True
+
+
+def test_same_or_nested_project_equal(tmp_path):
+    """Identity -> True."""
+    assert grounding._same_or_nested_project(str(tmp_path), tmp_path) is True
+
+
+def test_same_or_nested_project_unrelated(tmp_path):
+    """Sibling trees -> False."""
+    other = tmp_path / "other-project"
+    other.mkdir()
+    assert grounding._same_or_nested_project(str(other), tmp_path) is False
+
+
 def test_load_project_memory_spec_fails(tmp_path, monkeypatch):
     import importlib.util
 
