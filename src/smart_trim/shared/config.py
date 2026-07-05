@@ -26,8 +26,7 @@ try:
     MAX_CONTEXT_FOR_CLOUD = int(os.environ.get("SMART_TRIM_MAX_CONTEXT_CLOUD", "100000"))
 except ValueError:
     MAX_CONTEXT_FOR_CLOUD = 100000
-
-# than local's 20K cap — preserves early decisions
+# Cloud tier gets a larger cap than local's 20K — preserves early decisions
 # / root-causes in long sessions approaching compact.
 MAX_FALLBACK_SUMMARY = 3000  # Max chars for rule-based fallback
 
