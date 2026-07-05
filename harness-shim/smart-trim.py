@@ -9,6 +9,7 @@ CWD. This shim preserves the wired path ``~/.claude/hooks/smart-trim.py`` so
 Source of truth: ``~/smart-trim/src/smart_trim/``. History/changelog there.
 If the package ever fails to import, fail OPEN (never block compaction).
 """
+
 import sys
 
 try:
