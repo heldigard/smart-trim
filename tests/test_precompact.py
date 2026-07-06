@@ -224,6 +224,31 @@ def test_minimal_handoff_when_no_session(tmp_path, monkeypatch):
     assert seen["method"] == "minimal"
 
 
+def test_precompact_does_not_persist_postcompact_rules(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    (project / ".memory-bank").mkdir(parents=True)
+    _disable_external(monkeypatch)
+    monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: None)
+    monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.cleanup_old_summaries", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.check_memory_hygiene", lambda *a, **k: None
+    )
+
+    precompact.handle_precompact({"trigger": "auto", "sessionId": "sx", "cwd": str(project)})
+
+    active = (project / ".memory-bank" / "activeContext.md").read_text(encoding="utf-8")
+    topic = (
+        project / ".memory-bank" / "topics" / "session-handoffs.md"
+    ).read_text(encoding="utf-8")
+    assert "POST-COMPACT RULES" not in active
+    assert "DO NOT re-read files" not in active
+    assert "POST-COMPACT RULES" not in topic
+    assert "DO NOT re-read files" not in topic
+
+
 # --- return shape -----------------------------------------------------------
 
 

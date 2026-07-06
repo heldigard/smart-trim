@@ -86,6 +86,25 @@ def test_negative_constraints_redacts_secret_in_constraint():
     assert "REDACTED" in block or "sk-secretvalue123" not in block
 
 
+def test_negative_constraints_ignores_worker_and_postcompact_noise():
+    text = "\n".join(
+        [
+            "- [FUSION_PANEL][NO_DELEGATE][NO_TOOLS] You are a deliberation panelist.",
+            "- Do NOT use tools, APIs, or further delegation.",
+            "- 1. DO NOT re-read files you already know from this summary",
+            "- 2. DO NOT read screenshots/images into context",
+            "- 4. DO NOT re-read rules files - they are already loaded",
+            "- Never read .env files.",
+        ]
+    )
+    block = grounding.extract_negative_constraints(text)
+    assert "Never read .env files" in block
+    assert "FUSION_PANEL" not in block
+    assert "NO_DELEGATE" not in block
+    assert "DO NOT re-read" not in block
+    assert "screenshots/images" not in block
+
+
 # --- load_objective_registry -------------------------------------------------
 
 

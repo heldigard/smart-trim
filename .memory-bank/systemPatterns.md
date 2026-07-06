@@ -55,3 +55,4 @@ Audit caught: README + `_try_local` disagreed with the actual model order; the e
 - Label derivation: tests no longer hard-code the literal method strings; assertions now compare against `primary_label()/secondary_label()`. A future model swap (different default tag) propagates automatically.
 - Nested match: the test suite now covers all three cases (equal, nested, sibling).
 
+- 2026-07-06T22:58:02Z | status:active | Memory hygiene: runtime instructions from compaction hooks and worker wrappers are not durable project memory. Filter FUSION_PANEL/CODEX_WORKER/NO_DELEGATE/NO_TOOLS/NO_SWARM markers and generic post-compact 'DO NOT re-read...' guidance from negative constraint extraction; preserve real user/project constraints such as 'Never read .env files.'

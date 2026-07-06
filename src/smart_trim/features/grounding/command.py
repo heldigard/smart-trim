@@ -24,6 +24,23 @@ from smart_trim.shared.paths import redact_sensitive
 from smart_trim.shared.timeutil import hours_since_iso, objective_injection_window_hours
 
 _PROJECT_MEMORY: Any = None
+_RUNTIME_CONSTRAINT_NOISE_RE = re.compile(
+    r"("
+    r"\[(?:FUSION_PANEL|CODEX_WORKER|NO_DELEGATE|NO_TOOLS|NO_SWARM)\]|"
+    r"POST-COMPACT RULES|"
+    r"DO NOT re-read files you already know|"
+    r"DO NOT read screenshots/images|"
+    r"DO NOT re-read rules files|"
+    r"Use grep/find to locate|"
+    r"Work from this summary|"
+    r"No session JSONL available|"
+    r"Reload from project memory bank|"
+    r"You are a deliberation panelist|"
+    r"Do NOT use tools, APIs, or further delegation|"
+    r"Response style:"
+    r")",
+    re.IGNORECASE,
+)
 
 
 def load_memory_grounding(project_root: Path) -> str:
@@ -114,6 +131,8 @@ def extract_negative_constraints(text: str, max_items: int = 8) -> str:
 
 def _is_constraint_candidate(line: str) -> bool:
     if not line or len(line) < 8 or len(line) > 260:
+        return False
+    if _RUNTIME_CONSTRAINT_NOISE_RE.search(line):
         return False
     return bool(NEGATIVE_CONSTRAINT_RE.search(line))
 

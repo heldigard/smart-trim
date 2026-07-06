@@ -36,16 +36,6 @@ from smart_trim.shared import ollama as _ollama
 from smart_trim.shared import paths as _paths
 from smart_trim.shared.config import MAX_CONTEXT_FOR_CLOUD
 
-_POST_COMPACT_RULES = (
-    "\n---\n"
-    "POST-COMPACT RULES (next 3 turns):\n"
-    "1. DO NOT re-read files you already know from this summary\n"
-    "2. DO NOT read screenshots/images into context\n"
-    "3. Use grep/find to locate, read ONLY needed lines (max 50)\n"
-    "4. DO NOT re-read rules files — they are already loaded\n"
-    "5. Work from this summary, not from scratch\n"
-)
-
 
 def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
     """Handle PreCompact event - called before Claude's compression."""
@@ -63,9 +53,7 @@ def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
     _archive_summary(summary_text, method, trigger, session_id)
     # Rotate AFTER writing so the "keep newest N" invariant holds.
     _hygiene.cleanup_old_summaries()
-    _writer.update_project_memory(
-        summary_text + _POST_COMPACT_RULES, method, session_id, project_root=project_root
-    )
+    _writer.update_project_memory(summary_text, method, session_id, project_root=project_root)
 
     return _final_message(method, trigger, _hygiene.check_memory_hygiene())
 
