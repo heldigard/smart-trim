@@ -32,3 +32,4 @@ Hook shim: `~/.claude/hooks/smart-trim.py` (21L) → `smart_trim.features.precom
 
 - 2026-07-05T20:00:48Z | 2026-07-05: Updated canonical harness-shim/smart-trim.py to bootstrap ~/smart-trim/src by shim location/env override so isolated-HOME workers keep real PreCompact behavior; pytest+ruff passed.
 - 2026-07-06T22:58:02Z | status:completed | 2026-07-06: Fixed automatic memory-bank noise in PreCompact flow. smart-trim now writes only the handoff summary to project memory and no longer persists transient POST-COMPACT RULES into activeContext/session-handoffs.
+- 2026-07-08T00:49:42Z | status:completed | Memory hygiene: removed compact-session prompt rules and corrupted handoff fragments from activeContext; retained only durable smart-trim facts.

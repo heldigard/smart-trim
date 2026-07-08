@@ -1,18 +1,10 @@
 # Active Context
-- 2026-07-05: Smart trim summary (minimal).
-- ## Preserved Negative Constraints
-- - post_json` helper: dropped (dead code — defined in v3.2 but never called; summarize uses ollama_client.chat / cheap_complete).
-- - n v3.2 but never called; summarize uses ollama_client.chat / cheap_complete).
-- - 1. DO NOT re-read files you already know from this summary
-- - 2. DO NOT read screenshots/images into context
-- - 4. DO NOT re-read rules files — they are already loaded
-- **Task**: Session audit-smoke compacted (manual)
-- **Notes**: No session JSONL available; using minimal handoff.
-- **Next**: Reload from project memory bank if needed.
-- ---
-- POST-COMPACT RULES (next 3 turns):
-- 1. DO NOT re-read files you already know from this summary
-- 2. DO NOT read screenshots/images into context
-- 3. Use grep/find to locate, read ONLY needed lines (max 50)
-- 4. DO NOT re-read rules files — they are already loaded
-- 5. Work from this summary, not from scratch
+> Updated: 2026-07-08
+
+## Current State
+- No active implementation guide.
+- `smart-trim` is the PreCompact handler package behind the `~/.claude/hooks/smart-trim.py` shim.
+
+## Durable Notes
+- `post_json` was intentionally dropped during the v3.2 to v3.3 split; summarization uses `ollama_client.chat` / `cheap_complete`.
+- Do not store compact-session directives or transient prompt rules in project memory.
