@@ -41,8 +41,10 @@ try:  # Reset context-guard turn counter on compact (lives in ~/.claude/hooks/).
 except Exception:  # pragma: no cover - env-dependent
     cg_reset = None  # type: ignore[assignment]
 
-try:  # Shared local-Ollama client (chat/generate/embed) in ~/.claude/scripts/.
+try:  # Shared local-Ollama client (chat/generate/embed); graduated to ~/ollama-client/.
     import ollama_client
+
+    ollama_client.require("1.0")  # SemVer gate — fail fast on version drift
 except Exception:  # pragma: no cover - env-dependent
     ollama_client = None  # type: ignore[assignment]
 
