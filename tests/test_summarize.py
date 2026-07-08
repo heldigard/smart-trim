@@ -76,18 +76,18 @@ def test_summarize_ollama_swallows_unavailable(monkeypatch):
 # --- summarize_primary / secondary ------------------------------------------
 
 
-def test_summarize_primary_uses_setneuf_model(monkeypatch):
+def test_summarize_primary_uses_qwopus9b_model(monkeypatch):
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_primary("ctx")
-    assert "Qwopus" in fake.calls[0]["model"]
+    assert fake.calls[0]["model"] == "fredrezones55/Qwopus3.5:9b"
 
 
-def test_summarize_secondary_uses_qwen_model(monkeypatch):
+def test_summarize_secondary_uses_functiongemma_model(monkeypatch):
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_secondary("ctx")
-    assert fake.calls[0]["model"] == "qwen3.5:4b"
+    assert "functiongemma" in fake.calls[0]["model"]
 
 
 # --- summarize_cloud_cascade ------------------------------------------------
@@ -168,20 +168,22 @@ def test_summarize_model_env_overrides(monkeypatch):
 
 
 def test_primary_label_strips_quantization_suffix():
-    # Default model carries the Q4_64k_8GB-GPU VRAM hint — strip it for label.
     from smart_trim.features.summarize import command as sum_cmd
 
     label = sum_cmd.primary_label()
     assert label.startswith("ollama-")
     assert "_Q4_64k_8GB-GPU" not in label
     # Must end with the bare model identity (case preserved).
-    assert label == "ollama-SetneufPT/Qwopus3.5-4B-Coder-MTP"
+    assert label == "ollama-fredrezones55/Qwopus3.5:9b"
 
 
 def test_secondary_label_uses_bare_tag():
     from smart_trim.features.summarize import command as sum_cmd
 
-    assert sum_cmd.secondary_label() == "ollama-qwen3.5:4b"
+    assert (
+        sum_cmd.secondary_label()
+        == "ollama-hf.co/slyfox1186/qwen3.5-9b-opus-4.6-functiongemma.gguf:Q4_K_M"
+    )
 
 
 def test_labels_track_env_override(monkeypatch):
