@@ -1,8 +1,8 @@
 """LLM summarization cascade (quality-ordered, privacy-first).
 
 Chain:
-  1. Ollama Openclaw Qwen3.5-9b (LOCAL) — PRIMARY (smart_trim #1, 2026-07-08)
-  2. Ollama functiongemma qwen3.5-9b-opus-4.6 (LOCAL) — SECONDARY
+  1. Ollama HauhauCS Gemma4-12B-QAT-Balanced (LOCAL) — PRIMARY (smart_trim #1, 2026-07-08 PM)
+  2. Ollama SC117/heretic-QAT (LOCAL) — SECONDARY
   3. cheap_llm cascade -> DeepSeek (CLOUD, secret-scrubbed) — TERTIARY
 
 Each tier returns ``None`` on failure so the caller falls through. Cloud tier
@@ -20,15 +20,15 @@ _SYSTEM_PROMPT = (
     "Use the provided TASK/PROGRESS grounding to keep focus. Discard filler."
 )
 
-# 2026-07-08 new model bench: Openclaw (Qwen3.5-9b-Opus-Openclaw-Distilled)
-# is smart_trim #1 (11.53). functiongemma is #2 (11.33) and is also the
-# structured-output/tool/PDF-extract specialist, so it is the best fallback.
+# 2026-07-08 PM re-bench: HauhauCS/Gemma4-12B-QAT-Uncensored-Balanced is
+# smart_trim combined #1 (12.30 deep / 13.53 tiebreak). SC117/heretic-QAT is
+# #2 and a strong general fallback.
 _PRIMARY_MODEL = os.environ.get(
     "SMART_TRIM_PRIMARY_MODEL",
-    "hf.co/ykarout/Qwen3.5-9b-Opus-Openclaw-Distilled-GGUF:Q4_K_M",
+    "hf.co/HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced:Q4_K_M",
 )
 _SECONDARY_MODEL = os.environ.get(
-    "SMART_TRIM_SECONDARY_MODEL", "hf.co/slyfox1186/qwen3.5-9b-opus-4.6-functiongemma.gguf:Q4_K_M"
+    "SMART_TRIM_SECONDARY_MODEL", "hf.co/SC117/gemma-4-12B-it-heretic-QAT-GGUF:UD-Q4_K_XL"
 )
 
 
@@ -89,12 +89,12 @@ def summarize_ollama(context: str, model: str, grounding: str = "") -> str | Non
 
 
 def summarize_primary(context: str, grounding: str = "") -> str | None:
-    """PRIMARY: Ollama fredrezones55/Qwopus3.5:9b (smart_trim #1, 2026-07-08)."""
+    """PRIMARY: Ollama HauhauCS/Gemma4-12B-QAT-Balanced (smart_trim #1, 2026-07-08 PM)."""
     return summarize_ollama(context, _PRIMARY_MODEL, grounding=grounding)
 
 
 def summarize_secondary(context: str, grounding: str = "") -> str | None:
-    """SECONDARY: functiongemma qwen3.5-9b, the near-tied structured fallback."""
+    """SECONDARY: SC117/heretic-QAT, the near-tied general fallback."""
     return summarize_ollama(context, _SECONDARY_MODEL, grounding=grounding)
 
 

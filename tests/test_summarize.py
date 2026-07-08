@@ -76,18 +76,21 @@ def test_summarize_ollama_swallows_unavailable(monkeypatch):
 # --- summarize_primary / secondary ------------------------------------------
 
 
-def test_summarize_primary_uses_qwopus9b_model(monkeypatch):
+def test_summarize_primary_uses_hauhau_balanced_model(monkeypatch):
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_primary("ctx")
-    assert fake.calls[0]["model"] == "hf.co/ykarout/Qwen3.5-9b-Opus-Openclaw-Distilled-GGUF:Q4_K_M"
+    assert (
+        fake.calls[0]["model"]
+        == "hf.co/HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced:Q4_K_M"
+    )
 
 
-def test_summarize_secondary_uses_functiongemma_model(monkeypatch):
+def test_summarize_secondary_uses_heretic_model(monkeypatch):
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_secondary("ctx")
-    assert "functiongemma" in fake.calls[0]["model"]
+    assert "heretic" in fake.calls[0]["model"]
 
 
 # --- summarize_cloud_cascade ------------------------------------------------
@@ -174,14 +177,14 @@ def test_primary_label_strips_quantization_suffix():
     assert label.startswith("ollama-")
     assert "_Q4_64k_8GB-GPU" not in label
     # Must end with the bare model identity (case preserved).
-    assert label == "ollama-Qwen3.5-9b-Opus-Openclaw-Distilled"
+    assert label == "ollama-Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced"
 
 
 def test_secondary_label_uses_bare_tag():
     from smart_trim.features.summarize import command as sum_cmd
 
-    # After normalization: strips hf.co/slyfox1186/ prefix and :Q4_K_M tag
-    assert sum_cmd.secondary_label() == "ollama-qwen3.5-9b-opus-4.6-functiongemma.gguf"
+    # After normalization: strips hf.co/SC117/ prefix and :UD-Q4_K_XL tag
+    assert sum_cmd.secondary_label() == "ollama-gemma-4-12B-it-heretic-QAT"
 
 
 def test_labels_track_env_override(monkeypatch):
