@@ -80,7 +80,7 @@ def test_summarize_primary_uses_qwopus9b_model(monkeypatch):
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_primary("ctx")
-    assert fake.calls[0]["model"] == "fredrezones55/Qwopus3.5:9b"
+    assert fake.calls[0]["model"] == "hf.co/ykarout/Qwen3.5-9b-Opus-Openclaw-Distilled-GGUF:Q4_K_M"
 
 
 def test_summarize_secondary_uses_functiongemma_model(monkeypatch):
@@ -174,16 +174,14 @@ def test_primary_label_strips_quantization_suffix():
     assert label.startswith("ollama-")
     assert "_Q4_64k_8GB-GPU" not in label
     # Must end with the bare model identity (case preserved).
-    assert label == "ollama-fredrezones55/Qwopus3.5:9b"
+    assert label == "ollama-Qwen3.5-9b-Opus-Openclaw-Distilled"
 
 
 def test_secondary_label_uses_bare_tag():
     from smart_trim.features.summarize import command as sum_cmd
 
-    assert (
-        sum_cmd.secondary_label()
-        == "ollama-hf.co/slyfox1186/qwen3.5-9b-opus-4.6-functiongemma.gguf:Q4_K_M"
-    )
+    # After normalization: strips hf.co/slyfox1186/ prefix and :Q4_K_M tag
+    assert sum_cmd.secondary_label() == "ollama-qwen3.5-9b-opus-4.6-functiongemma.gguf"
 
 
 def test_labels_track_env_override(monkeypatch):

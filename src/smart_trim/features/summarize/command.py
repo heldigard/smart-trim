@@ -1,7 +1,7 @@
 """LLM summarization cascade (quality-ordered, privacy-first).
 
 Chain:
-  1. Ollama fredrezones55/Qwopus3.5:9b (LOCAL) — PRIMARY (smart_trim #1, 2026-07-08)
+  1. Ollama Openclaw Qwen3.5-9b (LOCAL) — PRIMARY (smart_trim #1, 2026-07-08)
   2. Ollama functiongemma qwen3.5-9b-opus-4.6 (LOCAL) — SECONDARY
   3. cheap_llm cascade -> DeepSeek (CLOUD, secret-scrubbed) — TERTIARY
 
@@ -20,10 +20,13 @@ _SYSTEM_PROMPT = (
     "Use the provided TASK/PROGRESS grounding to keep focus. Discard filler."
 )
 
-# 2026-07-08 canonical refactor re-bench: fredrezones55/Qwopus3.5:9b is
-# smart_trim #1 (11.25). functiongemma was #2 within 0.01 and is also the
+# 2026-07-08 new model bench: Openclaw (Qwen3.5-9b-Opus-Openclaw-Distilled)
+# is smart_trim #1 (11.53). functiongemma is #2 (11.33) and is also the
 # structured-output/tool/PDF-extract specialist, so it is the best fallback.
-_PRIMARY_MODEL = os.environ.get("SMART_TRIM_PRIMARY_MODEL", "fredrezones55/Qwopus3.5:9b")
+_PRIMARY_MODEL = os.environ.get(
+    "SMART_TRIM_PRIMARY_MODEL",
+    "hf.co/ykarout/Qwen3.5-9b-Opus-Openclaw-Distilled-GGUF:Q4_K_M",
+)
 _SECONDARY_MODEL = os.environ.get(
     "SMART_TRIM_SECONDARY_MODEL", "hf.co/slyfox1186/qwen3.5-9b-opus-4.6-functiongemma.gguf:Q4_K_M"
 )
@@ -124,7 +127,23 @@ _QUANT_SUFFIXES = (
 
 
 def _normalize_model_for_label(model: str) -> str:
-    """Strip a trailing quantization suffix; return the bare model tag."""
+    """Strip registry prefix, tag, and quantization suffix; return the bare model name."""
+    import re
+
+    # Strip known registry prefixes: domains (hf.co/user/) or provider_
+    # prefixes (huihui_ai/). Preserves simple word/ paths (e.g. custom/).
+    # Matches: hf.co/user/, huihui_ai/, aratan/, batiai/
+    model = re.sub(
+        r"^(?:[a-zA-Z0-9_-]+\.[a-zA-Z]{2,}/[a-zA-Z0-9_-]+/|[a-zA-Z0-9_-]*_[a-zA-Z0-9_-]+/|[a-zA-Z0-9_-]+(?=/[A-Z]))",
+        "",
+        model,
+    )
+    # Strip :tag (e.g. :Q4_K_M, :latest)
+    if ":" in model:
+        model = model.split(":")[0]
+    # Strip trailing -GGUF
+    model = re.sub(r"-GGUF$", "", model, flags=re.I)
+    # Strip quantization suffixes
     for suffix in _QUANT_SUFFIXES:
         if model.endswith(suffix):
             return model[: -len(suffix)]
