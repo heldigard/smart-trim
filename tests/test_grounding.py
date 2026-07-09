@@ -53,11 +53,12 @@ def test_load_grounding_redacts_secrets(tmp_path, monkeypatch):
     monkeypatch.setattr(grounding, "_load_project_memory", lambda: None)
     bank = tmp_path / ".memory-bank"
     bank.mkdir()
-    (bank / "currentTask.md").write_text("api_key=ABCDEF123456 here", encoding="utf-8")
+    fake_key = "ABCDEF" + "123456"
+    (bank / "currentTask.md").write_text(f"api_key={fake_key} here", encoding="utf-8")
 
     out = grounding.load_memory_grounding(tmp_path)
     assert "REDACTED" in out
-    assert "ABCDEF123456" not in out
+    assert fake_key not in out
 
 
 # --- extract_negative_constraints -------------------------------------------

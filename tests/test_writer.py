@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 from smart_trim.features.writer import command as writer
 
@@ -136,5 +137,6 @@ def test_is_foreign_session_resolve_oserror(monkeypatch):
 
     # Passing FakePath to _is_foreign_session should fall back to str(project_root) without raising
     # edit a path that is not under "/dummy"
-    assert writer._is_foreign_session("edit /elsewhere/x.py", FakePath("/dummy")) is True
-    assert writer._is_foreign_session("edit /dummy/x.py", FakePath("/dummy")) is False
+    fake_root = cast(Path, FakePath("/dummy"))
+    assert writer._is_foreign_session("edit /elsewhere/x.py", fake_root) is True
+    assert writer._is_foreign_session("edit /dummy/x.py", fake_root) is False

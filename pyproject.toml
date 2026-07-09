@@ -55,3 +55,7 @@ packages = ["src/smart_trim"]
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.vulture]
+# Test monkeypatch lambdas intentionally accept unused *args/**kwargs.
+exclude = ["tests/"]
