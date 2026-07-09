@@ -44,7 +44,7 @@ except Exception:  # pragma: no cover - env-dependent
 try:  # Shared local-Ollama client (chat/generate/embed); graduated to ~/ollama-client/.
     import ollama_client
 
-    ollama_client.require("1.0")  # SemVer gate — fail fast on version drift
+    ollama_client.require("1.1")  # chat template fallback + role constants
 except Exception:  # pragma: no cover - env-dependent
     ollama_client = None  # type: ignore[assignment]
 
