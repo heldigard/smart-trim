@@ -19,6 +19,7 @@ _SYSTEM_PROMPT = (
     "Preserve file paths, errors, decisions verbatim. "
     "Use the provided TASK/PROGRESS grounding to keep focus. Discard filler."
 )
+SUMMARY_NUM_PREDICT = 384
 
 # 2026-07-09 risk-weighted semantic validation (two identical rescored runs):
 # batiai-e2b 11.81 > cryptidbleh 11.63 > SC117 10.79 > HauhauCS 9.87.
@@ -77,7 +78,7 @@ def summarize_ollama(context: str, model: str, grounding: str = "") -> str | Non
             messages,
             model=model,
             temperature=0.2,
-            num_predict=600,
+            num_predict=SUMMARY_NUM_PREDICT,
             think=False,
             base_url=OLLAMA_BASE,
             cache=False,

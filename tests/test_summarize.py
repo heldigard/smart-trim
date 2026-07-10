@@ -65,6 +65,7 @@ def test_summarize_ollama_returns_client_output(monkeypatch):
     assert call["think"] is False
     assert call["cache"] is False
     assert call["num_ctx"] == 32768
+    assert call["num_predict"] == summarize.SUMMARY_NUM_PREDICT == 384
 
 
 def test_summarize_ollama_swallows_unavailable(monkeypatch):

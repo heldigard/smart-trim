@@ -50,6 +50,11 @@ def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
 
     summary_text, method, preserved = _resolve_summary(session_file, grounding, session_id, trigger)
     summary_text = _augment(summary_text, preserved, objective_block)
+    # One sanitized representation feeds every persistence sink. Previously the
+    # standalone archive received raw model/session text before writer redaction.
+    summary_text = _writer.mark_handoff_non_authoritative(
+        _paths.redact_sensitive(summary_text)
+    )
 
     _archive_summary(summary_text, method, trigger, session_id)
     # Rotate AFTER writing so the "keep newest N" invariant holds.
