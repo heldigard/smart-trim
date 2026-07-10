@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from smart_trim import __version__
 from smart_trim.features.fallback import command as _fallback
 from smart_trim.features.grounding import command as _grounding
 from smart_trim.features.hygiene import command as _hygiene
@@ -204,6 +205,9 @@ def _join_grounding(grounding: str, preserved: str) -> str:
 
 def main() -> None:
     """Main hook entry point for PreCompact event."""
+    if sys.argv[1:] == ["--version"]:
+        print(f"smart-trim {__version__}")
+        return
     try:
         input_data = json.load(sys.stdin)
     except (json.JSONDecodeError, OSError, ValueError):

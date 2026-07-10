@@ -391,6 +391,17 @@ def test_precompact_main_entry(monkeypatch, capsys):
     assert e.value.code == 0
 
 
+def test_precompact_version_does_not_read_stdin(monkeypatch, capsys):
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["smart-trim", "--version"])
+    monkeypatch.setattr(sys, "stdin", None)
+
+    precompact.main()
+
+    assert capsys.readouterr().out.strip() == "smart-trim 3.3.0"
+
+
 def test_precompact_try_local_returns_none_none(monkeypatch):
     monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
     monkeypatch.setattr(
