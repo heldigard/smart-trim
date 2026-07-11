@@ -48,13 +48,15 @@ def test_redact_sensitive_passes_clean_lines():
 
 
 def test_redact_sensitive_redacts_api_key():
-    out = paths.redact_sensitive("config: api_key=ABCDEF123456")
+    fake_key = "ABCDEF" + "123456"
+    out = paths.redact_sensitive(f"config: api_key={fake_key}")
     assert "[REDACTED" in out
-    assert "ABCDEF123456" not in out
+    assert fake_key not in out
 
 
 def test_redact_sensitive_redacts_sk_token():
-    out = paths.redact_sensitive("token: sk-abcdefghijklmnopqrstuvwxyz1234")
+    fake_token = "sk-" + "abcdefghijklmnopqrstuvwxyz" + "1234"
+    out = paths.redact_sensitive(f"token: {fake_token}")
     assert "[REDACTED" in out
 
 

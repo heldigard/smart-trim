@@ -12,8 +12,8 @@ the always-succeeds fallback.
 
 ## Fallback chain (quality-optimized)
 
-1. Ollama `fredrezones55/Qwopus3.5:9b` (local) — PRIMARY (`SMART_TRIM_PRIMARY_MODEL`)
-2. Ollama `hf.co/slyfox1186/qwen3.5-9b-opus-4.6-functiongemma.gguf:Q4_K_M` (local) — SECONDARY (`SMART_TRIM_SECONDARY_MODEL`)
+1. Ollama `batiai/gemma4-e2b:q4` (local) — PRIMARY (`SMART_TRIM_PRIMARY_MODEL`, risk-weighted smart_trim #1, 2026-07-09)
+2. Ollama `cryptidbleh/gemma4-claude-opus-4.6:latest` (local) — SECONDARY (`SMART_TRIM_SECONDARY_MODEL`)
 3. `cheap_llm` cascade → DeepSeek (cloud, secret-scrubbed) — TERTIARY
 4. Rule-based extraction (deterministic, ~0s) — FALLBACK
 

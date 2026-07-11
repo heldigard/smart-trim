@@ -12,6 +12,13 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from smart_trim.features.writer.active import (
+    ACTIVE_AUTHORITY_LINE,
+    ACTIVE_CONTEXT_MAX_LINES,
+    atomic_write_text,
+    mark_handoff_non_authoritative,
+    render_active_fields,
+)
 from smart_trim.shared.paths import get_project_root, redact_sensitive, slugify
 
 
@@ -26,13 +33,16 @@ def update_project_memory(
         project_root = project_root or get_project_root()
         memory_dir = project_root / ".memory-bank"
         memory_dir.mkdir(parents=True, exist_ok=True)
-        safe_summary = redact_sensitive(summary)
+        safe_summary = mark_handoff_non_authoritative(redact_sensitive(summary))
         handoff_body = f"Method: {method}\nSession: {session_id}\n\n{safe_summary}"
         if _is_foreign_session(safe_summary, project_root):
             _append_topic(memory_dir, "foreign-sessions", handoff_body)
             return
-        _write_active(memory_dir, safe_summary, method)
+        # Create the recovery target before publishing an active-context
+        # pointer to it. If either write fails, the previous active handoff is
+        # left intact by the outer best-effort boundary.
         _append_topic(memory_dir, "session-handoffs", handoff_body)
+        _write_active(memory_dir, safe_summary, method)
     except Exception:
         # Memory update is best-effort; never block compaction.
         pass
@@ -40,18 +50,13 @@ def update_project_memory(
 
 def _write_active(memory_dir: Path, safe_summary: str, method: str) -> None:
     active = memory_dir / "activeContext.md"
-    compact = re.sub(r"\n{3,}", "\n\n", safe_summary.strip())[:1200]
     lines = [
         "# Active Context",
-        f"- {datetime.now().date()}: Smart trim summary ({method}).",
+        f"- {datetime.now().date()}: Smart trim summary ({method[:80]}).",
+        ACTIVE_AUTHORITY_LINE,
     ]
-    for line in compact.splitlines():
-        line = line.strip()
-        if line:
-            lines.append(f"- {line[:180]}")
-        if len(lines) >= 28:
-            break
-    active.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    lines.extend(render_active_fields(safe_summary, lines))
+    atomic_write_text(active, "\n".join(lines[:ACTIVE_CONTEXT_MAX_LINES]) + "\n")
 
 
 def _append_topic(memory_dir: Path, title: str, content: str) -> None:
@@ -120,4 +125,9 @@ def _any_path_under_root(paths: list[str], root: str) -> bool:
     return False
 
 
-__all__ = ["update_project_memory", "append_project_topic", "update_topic_index"]
+__all__ = [
+    "update_project_memory",
+    "append_project_topic",
+    "update_topic_index",
+    "mark_handoff_non_authoritative",
+]

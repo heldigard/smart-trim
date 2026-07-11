@@ -123,26 +123,42 @@ def get_session_id(input_data: dict[str, Any] | None = None) -> str:
     return "unknown"
 
 
-def get_context_usage() -> float:
-    """Estimate context usage from environment. Returns percentage (0-100)."""
-    context_used = os.environ.get("CLAUDE_CONTEXT_USED")
-    context_total = os.environ.get("CLAUDE_CONTEXT_TOTAL")
-    if context_used and context_total:
-        try:
-            used = int(context_used)
-            total = int(context_total)
-            return (used / total) * 100.0 if total > 0 else 0.0
-        except (ValueError, ZeroDivisionError):
-            pass
-    return 0.0
+# Summarization is newest-first and capped (MAX_CONTEXT_FOR_CLOUD chars), so
+# only the tail of a large session JSONL can ever reach the LLM. 4 MiB is ~40x
+# the extraction cap — reading more just burns memory/latency at compact time.
+_SESSION_TAIL_BYTES_DEFAULT = 4 * 1024 * 1024
+
+
+def _session_tail_bytes() -> int:
+    try:
+        return int(
+            os.environ.get("SMART_TRIM_SESSION_TAIL_BYTES", str(_SESSION_TAIL_BYTES_DEFAULT))
+        )
+    except ValueError:
+        return _SESSION_TAIL_BYTES_DEFAULT
 
 
 def read_session(session_file: Path) -> list[dict[str, Any]]:
-    """Read session from JSONL file (skip blank/malformed lines)."""
-    if not session_file.exists():
+    """Read session messages from JSONL, bounded to the newest tail.
+
+    Skips blank/malformed lines. Files larger than the tail budget are read
+    from the end (the partial first line is dropped); set
+    ``SMART_TRIM_SESSION_TAIL_BYTES=0`` to force a full read.
+    """
+    try:
+        size = session_file.stat().st_size
+    except OSError:
         return []
-    with open(session_file, encoding="utf-8") as f:
-        lines = f.readlines()
+    cap = _session_tail_bytes()
+    try:
+        with open(session_file, "rb") as f:
+            if 0 < cap < size:
+                f.seek(size - cap)
+                f.readline()  # drop the partial line at the seek boundary
+            data = f.read()
+    except OSError:
+        return []
+    lines = data.decode("utf-8", errors="replace").splitlines()
     parsed = [_parse_jsonl_line(ln) for ln in lines]
     return [msg for msg in parsed if msg is not None]
 
@@ -160,7 +176,6 @@ __all__ = [
     "find_latest_session_jsonl",
     "get_session_file",
     "get_session_id",
-    "get_context_usage",
     "read_session",
     "extract_context_for_summary",
 ]
