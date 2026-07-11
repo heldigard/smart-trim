@@ -28,28 +28,32 @@ def test_get_session_id_unknown_default(monkeypatch):
     assert session.get_session_id({}) == "unknown"
 
 
-# --- get_context_usage -------------------------------------------------------
-
-
-def test_get_context_usage_from_env(monkeypatch):
-    monkeypatch.setenv("CLAUDE_CONTEXT_USED", "150000")
-    monkeypatch.setenv("CLAUDE_CONTEXT_TOTAL", "200000")
-    assert session.get_context_usage() == 75.0
-
-
-def test_get_context_usage_no_env(monkeypatch):
-    monkeypatch.delenv("CLAUDE_CONTEXT_USED", raising=False)
-    monkeypatch.delenv("CLAUDE_CONTEXT_TOTAL", raising=False)
-    assert session.get_context_usage() == 0.0
-
-
-def test_get_context_usage_zero_total(monkeypatch):
-    monkeypatch.setenv("CLAUDE_CONTEXT_USED", "10")
-    monkeypatch.setenv("CLAUDE_CONTEXT_TOTAL", "0")
-    assert session.get_context_usage() == 0.0
-
-
 # --- read_session ------------------------------------------------------------
+
+
+def test_read_session_tail_bounded_keeps_newest_messages(tmp_path, monkeypatch):
+    # A session larger than the tail budget is read from the end: newest
+    # messages survive, the partial line at the seek boundary is dropped.
+    monkeypatch.setenv("SMART_TRIM_SESSION_TAIL_BYTES", "4096")
+    jsonl = tmp_path / "big.jsonl"
+    lines = [json.dumps({"seq": i, "pad": "x" * 100}) for i in range(200)]
+    jsonl.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    messages = session.read_session(jsonl)
+
+    assert messages, "tail read must yield messages"
+    assert len(messages) < 200, "older messages beyond the tail budget are skipped"
+    assert messages[-1]["seq"] == 199, "the newest message must survive"
+    seqs = [m["seq"] for m in messages]
+    assert seqs == sorted(seqs), "message order preserved"
+
+
+def test_read_session_tail_zero_forces_full_read(tmp_path, monkeypatch):
+    monkeypatch.setenv("SMART_TRIM_SESSION_TAIL_BYTES", "0")
+    jsonl = tmp_path / "full.jsonl"
+    lines = [json.dumps({"seq": i}) for i in range(50)]
+    jsonl.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert len(session.read_session(jsonl)) == 50
 
 
 def test_read_session_parses_jsonl(tmp_path):
@@ -250,12 +254,6 @@ def test_get_session_file_resolves_from_stdin(monkeypatch, tmp_path):
     # Search all projects when session does not exist
     input_data_not_found = {"sessionId": "sess-999", "cwd": "/other/path"}
     assert session.get_session_file(input_data_not_found) is None
-
-
-def test_get_context_usage_exception(monkeypatch):
-    monkeypatch.setenv("CLAUDE_CONTEXT_USED", "not-a-number")
-    monkeypatch.setenv("CLAUDE_CONTEXT_TOTAL", "2000")
-    assert session.get_context_usage() == 0.0
 
 
 def test_content_extraction_edge_cases():
