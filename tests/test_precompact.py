@@ -240,9 +240,9 @@ def test_precompact_does_not_persist_postcompact_rules(tmp_path, monkeypatch):
     precompact.handle_precompact({"trigger": "auto", "sessionId": "sx", "cwd": str(project)})
 
     active = (project / ".memory-bank" / "activeContext.md").read_text(encoding="utf-8")
-    topic = (
-        project / ".memory-bank" / "topics" / "session-handoffs.md"
-    ).read_text(encoding="utf-8")
+    topic = (project / ".memory-bank" / "topics" / "session-handoffs.md").read_text(
+        encoding="utf-8"
+    )
     assert "POST-COMPACT RULES" not in active
     assert "DO NOT re-read files" not in active
     assert "POST-COMPACT RULES" not in topic
@@ -371,9 +371,7 @@ def test_handle_precompact_redacts_before_archive_and_writer(tmp_path, monkeypat
         "smart_trim.features.hygiene.command.check_memory_hygiene", lambda *a, **k: None
     )
 
-    precompact.handle_precompact(
-        {"trigger": "auto", "sessionId": "s", "cwd": str(project)}
-    )
+    precompact.handle_precompact({"trigger": "auto", "sessionId": "s", "cwd": str(project)})
 
     assert len(seen) == 2
     assert all(secret not in value and "REDACTED" in value for value in seen)
@@ -468,3 +466,19 @@ def test_precompact_join_grounding():
     assert precompact._join_grounding("", "preserved") == "preserved"
     assert precompact._join_grounding("", "") == ""
     assert precompact._join_grounding("grounding", "preserved") == "grounding\n\npreserved"
+
+
+def test_main_fails_open_when_handler_raises(monkeypatch, capsys):
+    # A summarization bug must never block compaction: main() emits
+    # {"continue": true} and routes the error to stderr.
+    import io
+    import json as _json
+
+    monkeypatch.setattr(
+        precompact, "handle_precompact", lambda data: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"trigger": "auto"}'))
+    precompact.main()
+    captured = capsys.readouterr()
+    assert _json.loads(captured.out) == {"continue": True}
+    assert "boom" in captured.err
