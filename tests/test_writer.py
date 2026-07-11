@@ -76,9 +76,9 @@ def test_session_constraints_are_persisted_as_non_authoritative_data(tmp_path):
         project_root=project,
     )
     active = (project / ".memory-bank" / "activeContext.md").read_text(encoding="utf-8")
-    topic = (
-        project / ".memory-bank" / "topics" / "session-handoffs.md"
-    ).read_text(encoding="utf-8")
+    topic = (project / ".memory-bank" / "topics" / "session-handoffs.md").read_text(
+        encoding="utf-8"
+    )
 
     for persisted in (active, topic):
         assert "Session constraints (quoted)" in persisted
@@ -181,15 +181,8 @@ def test_write_active_prioritizes_critical_fields_before_verbose_optional(tmp_pa
 def test_active_renderer_preserves_middle_error_id_and_path(tmp_path):
     project = tmp_path / "proj"
     project.mkdir()
-    error = (
-        ("noise " * 80)
-        + "E_PARSE_MIDDLE /srv/app/parser.py:42 "
-        + ("tail " * 80)
-    )
-    summary = (
-        f"**Task**: diagnose parser\n**Errors**: {error}\n"
-        f"**Files**: {project}/src/parser.py"
-    )
+    error = ("noise " * 80) + "E_PARSE_MIDDLE /srv/app/parser.py:42 " + ("tail " * 80)
+    summary = f"**Task**: diagnose parser\n**Errors**: {error}\n**Files**: {project}/src/parser.py"
     writer.update_project_memory(summary, "fallback", "s", project_root=project)
     active = (project / ".memory-bank" / "activeContext.md").read_text(encoding="utf-8")
 
@@ -199,9 +192,7 @@ def test_active_renderer_preserves_middle_error_id_and_path(tmp_path):
 
 
 def test_parser_rejects_malformed_bold_label_without_corrupting_task():
-    fields, notes = active_renderer.parse_summary_fields(
-        "**Task:** malformed\n**Task**: canonical"
-    )
+    fields, notes = active_renderer.parse_summary_fields("**Task:** malformed\n**Task**: canonical")
     assert fields["Task"] == ["canonical"]
     assert "**Task:** malformed" in notes
 
