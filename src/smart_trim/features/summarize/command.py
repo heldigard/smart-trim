@@ -21,15 +21,20 @@ _SYSTEM_PROMPT = (
 )
 SUMMARY_NUM_PREDICT = 384
 
-# 2026-07-09 risk-weighted semantic validation (two identical rescored runs):
-# batiai-e2b 11.81 > cryptidbleh 11.63 > SC117 10.79 > HauhauCS 9.87.
+# Round-10 2026-07-12 cross-task 4-way validation
+# (topics/candidates-round-10-2026-07-12.md): SC117/heretic-QAT dethroned
+# HauhauCS-Balanced (10.79 vs 9.87, +0.92). Round-11 cross-task re-validation
+# (TeichAI 8.74 #3, xentriom 8.89 #3) confirmed SC117 holds. Round-12
+# official 12B QAT tied HauhauCS within 0.05 noise but loses SC117 (-0.97)
+# — so SC117 remains smart_trim champion. batiai-e2b/cryptidbleh are now
+# fallback-of-fallbacks via the available-model tail.
 _PRIMARY_MODEL = os.environ.get(
     "SMART_TRIM_PRIMARY_MODEL",
-    "batiai/gemma4-e2b:q4",
+    "hf.co/SC117/gemma-4-12B-it-heretic-QAT-GGUF:UD-Q4_K_XL",
 )
 _SECONDARY_MODEL = os.environ.get(
     "SMART_TRIM_SECONDARY_MODEL",
-    "cryptidbleh/gemma4-claude-opus-4.6:latest",
+    "hf.co/HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced:Q4_K_M",
 )
 
 
