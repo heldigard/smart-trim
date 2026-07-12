@@ -1,4 +1,4 @@
-"""Write-side: persist the compact handoff to the project memory bank.
+"""Write-side: persist the compact handoff to the agent memory bank.
 
 Writes ``.memory-bank/activeContext.md`` (reloaded by SessionStart) and appends
 a deep-copy entry to ``.memory-bank/topics/session-handoffs.md``. Cross-project
@@ -22,13 +22,13 @@ from smart_trim.features.writer.active import (
 from smart_trim.shared.paths import get_project_root, redact_sensitive, slugify
 
 
-def update_project_memory(
+def update_agent_memory(
     summary: str,
     method: str,
     session_id: str = "unknown",
     project_root: Path | None = None,
 ) -> None:
-    """Write compact and deep handoffs to the shared project memory bank."""
+    """Write compact and deep handoffs to the shared agent memory bank."""
     try:
         project_root = project_root or get_project_root()
         memory_dir = project_root / ".memory-bank"
@@ -87,7 +87,7 @@ def update_topic_index(topics_dir: Path, slug: str, title: str) -> None:
     index = topics_dir / "_index.md"
     if not index.exists():
         index.write_text(
-            "# Topic Index\n> Deep project memory. Search/read on demand; "
+            "# Topic Index\n> Deep agent memory. Search/read on demand; "
             "do not load all topics by default.\n\n## Topics\n",
             encoding="utf-8",
         )
@@ -126,7 +126,7 @@ def _any_path_under_root(paths: list[str], root: str) -> bool:
 
 
 __all__ = [
-    "update_project_memory",
+    "update_agent_memory",
     "append_project_topic",
     "update_topic_index",
     "mark_handoff_non_authoritative",

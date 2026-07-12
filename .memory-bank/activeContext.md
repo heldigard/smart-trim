@@ -7,4 +7,4 @@
 
 ## Durable Notes
 - `post_json` was intentionally dropped during the v3.2 to v3.3 split; summarization uses `ollama_client.chat` / `cheap_complete`.
-- Do not store compact-session directives or transient prompt rules in project memory.
+- Do not store compact-session directives or transient prompt rules in agent memory.

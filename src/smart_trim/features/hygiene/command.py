@@ -60,10 +60,18 @@ def _unlink_if_aged(f: Path, cutoff: float) -> bool:
 
 
 def _enforce_cap(summary_dir: Path, max_files: int) -> int:
-    # If still too many, keep only the newest max_files
-    remaining = sorted(summary_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    # If still too many, keep only the newest readable max_files. An entry
+    # whose metadata cannot be read is retained, but must not prevent healthy
+    # entries from being rotated.
+    readable: list[tuple[float, Path]] = []
+    for path in summary_dir.glob("*.md"):
+        try:
+            readable.append((path.stat().st_mtime, path))
+        except OSError:
+            continue
+    remaining = [path for _, path in sorted(readable, key=lambda item: item[0], reverse=True)]
     removed = 0
-    for f in remaining[max_files:]:
+    for f in remaining[max(0, max_files) :]:
         if _safe_unlink(f):
             removed += 1
     return removed

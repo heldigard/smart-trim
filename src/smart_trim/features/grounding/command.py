@@ -1,19 +1,17 @@
-"""Read-side grounding: load memory bank + objective registry to anchor the summary.
+"""Read-side grounding: load agent memory + objective registry to anchor the summary.
 
 Loads currentTask / recent progress / previous activeContext from the project's
 ``.memory-bank/`` so a compact preserves the real objective and verified state
 instead of drifting. Also surfaces the shared ``current-objective.json`` registry
 when it is fresh and belongs to this project.
 
-NOTE: ``_load_project_memory`` resolves the freshness helper at the ABSOLUTE path
-``~/.claude/scripts/project-memory.py``. The v3.2 monolith built this path
-relative to ``__file__`` (``parent.parent / scripts``), which broke after the
-package split moved ``__file__`` — so this is a corrected absolute resolution.
+The freshness filter comes from the installed ``agent_memory`` package. It is
+optional at runtime: an unavailable or broken installation degrades to the raw
+memory-bank lines instead of blocking compaction.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
 from pathlib import Path
@@ -23,7 +21,11 @@ from smart_trim.shared.config import NEGATIVE_CONSTRAINT_RE
 from smart_trim.shared.paths import redact_sensitive
 from smart_trim.shared.timeutil import hours_since_iso, objective_injection_window_hours
 
-_PROJECT_MEMORY: Any = None
+try:
+    from agent_memory.features.entries import command as _agent_memory_entries
+except Exception:  # pragma: no cover - optional environment dependency
+    _agent_memory_entries = None  # type: ignore[assignment]
+
 _RUNTIME_CONSTRAINT_NOISE_RE = re.compile(
     r"("
     r"\[(?:FUSION_PANEL|CODEX_WORKER|NO_DELEGATE|NO_TOOLS|NO_SWARM)\]|"
@@ -34,7 +36,7 @@ _RUNTIME_CONSTRAINT_NOISE_RE = re.compile(
     r"Use grep/find to locate|"
     r"Work from this summary|"
     r"No session JSONL available|"
-    r"Reload from project memory bank|"
+    r"Reload from \w+ memory bank|"
     r"You are a deliberation panelist|"
     r"Do NOT use tools, APIs, or further delegation|"
     r"Response style:"
@@ -44,7 +46,7 @@ _RUNTIME_CONSTRAINT_NOISE_RE = re.compile(
 
 
 def load_memory_grounding(project_root: Path) -> str:
-    """Load compact grounding from the project memory bank (see module docstring)."""
+    """Load compact grounding from the agent memory bank (see module docstring)."""
     bank = project_root / ".memory-bank"
     if not bank.is_dir():
         return ""
@@ -72,10 +74,9 @@ def _filtered_memory_lines(name: str, path: Path) -> list[str]:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return []
-    helper = _load_project_memory()
-    if helper is not None and hasattr(helper, "filter_lines_for_injection"):
+    if _agent_memory_entries is not None:
         try:
-            return helper.filter_lines_for_injection(name, lines)
+            return _agent_memory_entries.filter_lines_for_injection(name, lines)
         except Exception:
             return lines
     return lines
@@ -86,27 +87,6 @@ def _take_chars(lines: list[str], max_chars: int, *, from_end: bool = False) -> 
     if from_end:
         return text[-max_chars:]
     return text[:max_chars]
-
-
-def _load_project_memory() -> Any:
-    """Load project-memory.py so smart-trim shares the same freshness filter.
-
-    Resolved at the absolute ``~/.claude/scripts/project-memory.py`` — the v3.2
-    ``__file__``-relative path broke after the package split moved ``__file__``.
-    """
-    global _PROJECT_MEMORY
-    if _PROJECT_MEMORY is not None:
-        return _PROJECT_MEMORY
-    path = Path.home() / ".claude" / "scripts" / "project-memory.py"
-    if not path.is_file():
-        return None
-    spec = importlib.util.spec_from_file_location("project_memory_for_smart_trim", path)
-    if spec is None or spec.loader is None:
-        return None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    _PROJECT_MEMORY = module
-    return module
 
 
 def extract_negative_constraints(text: str, max_items: int = 8) -> str:

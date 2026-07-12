@@ -48,16 +48,17 @@ src/smart_trim/
    `~/.claude/scripts/`). Without `Path(__file__).resolve()` (Gemini arrives via
    symlink) these silently fail → rule-based fallback only. compat is imported
    by `smart_trim/__init__.py` so it runs exactly once on package import.
-2. **`_load_project_memory`** resolves the project-memory helper at
-   `~/.claude/scripts/project-memory.py` (NOT a path relative to `__file__`,
-   which would break after the split) — see `features/grounding/command.py`.
+2. **Agent-memory freshness filtering** comes from the optional installed
+   `agent_memory.features.entries.command` module. Never restore a file-path
+   import from `~/.claude/scripts/`; missing agent-memory must degrade to raw
+   memory-bank lines — see `features/grounding/command.py`.
 3. **Output is byte-identical** to the v3.2 monolith for the same input — the
    split is pure reorganization. `handle_precompact` returns the same dict,
    writes the same `activeContext.md` and `~/.claude/summaries/` artifacts.
 
 ## Commands
 
-- Install (dev): `pip install -e ~/smart-trim`
+- Install (dev): `pip install -e ~/agent-memory && pip install -e ~/smart-trim`
 - Test: `python3 -m pytest tests/ -q`
 - Layout gate: `python3 -m pytest tests/test_layout.py -q` (250L meta per module)
 - Lint: `ruff check src/ tests/`

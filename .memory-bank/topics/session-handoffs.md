@@ -10,7 +10,7 @@ Session: smoke
 
 **Task**: Session smoke compacted (manual)
 **Notes**: No session JSONL available; using minimal handoff.
-**Next**: Reload from project memory bank if needed.
+**Next**: Reload from agent memory bank if needed.
 ---
 POST-COMPACT RULES (next 3 turns):
 1. DO NOT re-read files you already know from this summary
@@ -32,7 +32,7 @@ Session: verify-smoke
 
 **Task**: Session verify-smoke compacted (manual)
 **Notes**: No session JSONL available; using minimal handoff.
-**Next**: Reload from project memory bank if needed.
+**Next**: Reload from agent memory bank if needed.
 ---
 POST-COMPACT RULES (next 3 turns):
 1. DO NOT re-read files you already know from this summary
@@ -54,7 +54,7 @@ Session: audit-smoke
 
 **Task**: Session audit-smoke compacted (manual)
 **Notes**: No session JSONL available; using minimal handoff.
-**Next**: Reload from project memory bank if needed.
+**Next**: Reload from agent memory bank if needed.
 ---
 POST-COMPACT RULES (next 3 turns):
 1. DO NOT re-read files you already know from this summary

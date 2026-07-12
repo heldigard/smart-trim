@@ -57,7 +57,7 @@ def test_injects_negative_constraints_into_grounding(tmp_path, monkeypatch):
         return "**Task**: Fix parser\n**Next**: Run tests"
 
     monkeypatch.setattr(f"{_SUMMARIZE}.summarize_primary", primary)
-    monkeypatch.setattr(f"{_WRITER}.update_project_memory", lambda *a, **k: None)
+    monkeypatch.setattr(f"{_WRITER}.update_agent_memory", lambda *a, **k: None)
     monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
     monkeypatch.setattr(
         "smart_trim.features.hygiene.command.cleanup_old_summaries", lambda *a, **k: None
@@ -125,7 +125,7 @@ def test_primary_method_label(tmp_path, monkeypatch):
         seen["method"] = method
         seen["project_root"] = str(project_root)
 
-    monkeypatch.setattr(f"{_WRITER}.update_project_memory", capture)
+    monkeypatch.setattr(f"{_WRITER}.update_agent_memory", capture)
     monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
     monkeypatch.setattr(
         "smart_trim.features.hygiene.command.cleanup_old_summaries", lambda *a, **k: None
@@ -165,7 +165,7 @@ def test_falls_back_to_rule_based_when_all_llm_fail(tmp_path, monkeypatch):
 
     seen: dict[str, str] = {}
     monkeypatch.setattr(
-        f"{_WRITER}.update_project_memory",
+        f"{_WRITER}.update_agent_memory",
         lambda summary, method, session_id="unknown", project_root=None: seen.update(method=method),
     )
 
@@ -193,7 +193,7 @@ def test_cloud_tier_used_when_ollama_down(tmp_path, monkeypatch):
 
     seen: dict[str, str] = {}
     monkeypatch.setattr(
-        f"{_WRITER}.update_project_memory",
+        f"{_WRITER}.update_agent_memory",
         lambda summary, method, session_id="unknown", project_root=None: seen.update(method=method),
     )
 
@@ -216,7 +216,7 @@ def test_minimal_handoff_when_no_session(tmp_path, monkeypatch):
 
     seen: dict[str, str] = {}
     monkeypatch.setattr(
-        f"{_WRITER}.update_project_memory",
+        f"{_WRITER}.update_agent_memory",
         lambda summary, method, session_id="unknown", project_root=None: seen.update(method=method),
     )
 
@@ -264,7 +264,7 @@ def test_returns_continue_true_with_systemmessage_on_auto(tmp_path, monkeypatch)
     monkeypatch.setattr(
         "smart_trim.features.hygiene.command.check_memory_hygiene", lambda *a, **k: None
     )
-    monkeypatch.setattr(f"{_WRITER}.update_project_memory", lambda *a, **k: None)
+    monkeypatch.setattr(f"{_WRITER}.update_agent_memory", lambda *a, **k: None)
 
     result = precompact.handle_precompact(
         {"trigger": "auto", "sessionId": "s", "cwd": str(project)}
@@ -341,6 +341,22 @@ def test_precompact_archive_summary(tmp_path, monkeypatch):
     precompact._archive_summary("summary-text", "method-name", "auto", "session-id")
 
 
+def test_archive_summary_sanitizes_session_id_and_avoids_rapid_overwrite(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    precompact._archive_summary("first", "fallback", "auto", "../escaped")
+    precompact._archive_summary("second", "fallback", "auto", "../escaped")
+
+    archive_dir = tmp_path / ".claude" / "summaries"
+    files = sorted(archive_dir.glob("*.md"))
+    assert len(files) == 2
+    assert all(path.parent == archive_dir for path in files)
+    assert not list((tmp_path / ".claude").glob("escaped*"))
+    contents = {path.read_text(encoding="utf-8") for path in files}
+    assert any("first" in value for value in contents)
+    assert any("second" in value for value in contents)
+
+
 def test_handle_precompact_redacts_before_archive_and_writer(tmp_path, monkeypatch):
     project = tmp_path / "project"
     (project / ".memory-bank").mkdir(parents=True)
@@ -361,7 +377,7 @@ def test_handle_precompact_redacts_before_archive_and_writer(tmp_path, monkeypat
         precompact, "_archive_summary", lambda summary, *args, **kwargs: seen.append(summary)
     )
     monkeypatch.setattr(
-        f"{_WRITER}.update_project_memory",
+        f"{_WRITER}.update_agent_memory",
         lambda summary, *args, **kwargs: seen.append(summary),
     )
     monkeypatch.setattr(
@@ -393,7 +409,7 @@ def test_precompact_returns_warning_on_auto(tmp_path, monkeypatch):
         "smart_trim.features.hygiene.command.check_memory_hygiene",
         lambda *a, **k: "Hygiene warning",
     )
-    monkeypatch.setattr(f"{_WRITER}.update_project_memory", lambda *a, **k: None)
+    monkeypatch.setattr(f"{_WRITER}.update_agent_memory", lambda *a, **k: None)
 
     result = precompact.handle_precompact(
         {"trigger": "auto", "sessionId": "s", "cwd": str(project)}

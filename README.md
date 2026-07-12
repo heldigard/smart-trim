@@ -2,7 +2,7 @@
 
 LLM-powered **PreCompact** context-compression hook for Claude Code. Compresses
 the active session into a compact handoff (`Task / Acceptance / Verified /
-Current / Errors / Decisions / Next / Files`) grounded in the project memory
+Current / Errors / Decisions / Next / Files`) grounded in the agent memory
 bank, so compaction preserves the real objective instead of drifting.
 
 **Privacy-first**: primary + secondary summarization run on **local Ollama**
@@ -19,16 +19,21 @@ the always-succeeds fallback.
 
 ## Architecture
 
-Vertical-slice package (`src/smart_trim/{shared,features}/}`), graduated from a
+Vertical-slice package (`src/smart_trim/{shared,features}/`), graduated from a
 1114-line monolith. See `CLAUDE.md`. Entry point is the thin shim
 `~/.claude/hooks/smart-trim.py`.
 
 ## Install (dev)
 
 ```bash
+pip install -e ~/agent-memory
 pip install -e ~/smart-trim
 python3 -m pytest ~/smart-trim/tests/ -q
 ```
+
+`agent-memory` supplies the freshness filter used when grounding a handoff from
+`.memory-bank/`. The integration is fail-open: if the package is unavailable,
+smart-trim keeps the raw memory lines and compaction continues.
 
 ## Wire (already wired — do not change)
 

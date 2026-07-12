@@ -22,6 +22,17 @@ def test_fallback_extracts_file_paths():
     assert "/home/eldi/smart-trim/src/app.py" in out
 
 
+def test_fallback_file_paths_preserve_first_seen_order_and_deduplicate():
+    msgs = [
+        _envelope("user", "edit /tmp/b.py then /tmp/a.py"),
+        _envelope("assistant", "verified /tmp/b.py and /tmp/c.py"),
+    ]
+
+    out = fallback.generate_fallback_summary(msgs)
+
+    assert "**Files**: /tmp/b.py, /tmp/a.py, /tmp/c.py" in out
+
+
 def test_fallback_extracts_error_lines():
     msgs = [_envelope("assistant", "Traceback:\nValueError: bad thing failed")]
     out = fallback.generate_fallback_summary(msgs)

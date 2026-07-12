@@ -22,6 +22,8 @@ def extract_context_for_summary(
     messages: list[dict[str, Any]], max_length: int = MAX_CONTEXT_FOR_SUMMARY
 ) -> str:
     """Extract conversation context for LLM summarization (newest-first, capped)."""
+    if max_length <= 0:
+        return ""
     context_parts: list[str] = []
     total_length = 0
 
@@ -38,10 +40,11 @@ def extract_context_for_summary(
         if not text:
             continue
         part = f"[{role.upper()}]: {text}"
-        if total_length + len(part) > max_length:
+        separator_length = 2 if context_parts else 0
+        if total_length + separator_length + len(part) > max_length:
             break
         context_parts.insert(0, part)
-        total_length += len(part)
+        total_length += separator_length + len(part)
 
     return "\n\n".join(context_parts)
 

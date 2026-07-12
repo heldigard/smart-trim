@@ -33,7 +33,7 @@ def generate_fallback_summary(messages: list[dict[str, Any]], session_id: str = 
     decision_str = "\n".join([f"- {d}" for d in decisions]) if decisions else "None detected"
 
     summary = f"""**Task**: Session with {len(user_msgs)} user requests
-**Files**: {", ".join(list(file_paths)[:8]) if file_paths else "None"}
+**Files**: {", ".join(file_paths[:8]) if file_paths else "None"}
 **Errors**: {error_str}
 **Decisions**: {decision_str}
 **Session**: {session_id}"""
@@ -41,13 +41,17 @@ def generate_fallback_summary(messages: list[dict[str, Any]], session_id: str = 
     return summary[:MAX_FALLBACK_SUMMARY]
 
 
-def _extract_file_paths(normalized: list[dict[str, Any]]) -> set[str]:
+def _extract_file_paths(normalized: list[dict[str, Any]]) -> list[str]:
     """Pull unix + windows file paths out of message content and tool inputs."""
-    file_paths: set[str] = set()
+    file_paths: list[str] = []
+    seen: set[str] = set()
     for msg in normalized:
         raw = str(msg.get("content", ""))
         raw += " " + json.dumps(msg.get("input", {}), ensure_ascii=False)
-        file_paths.update(_paths_in(raw))
+        for path in _paths_in(raw):
+            if path not in seen:
+                seen.add(path)
+                file_paths.append(path)
     return file_paths
 
 

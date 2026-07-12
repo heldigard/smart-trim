@@ -8,9 +8,9 @@
 - `shared/compat.py` is imported once via `smart_trim/__init__.py`; it owns the
   `sys.path` inserts for `~/.claude/scripts/` and the graceful `try/except`
   imports of `ollama_client` / `cheap_complete` / `context_guard_lib`.
-- `_load_project_memory` resolves the helper at the absolute path
-  `~/.claude/scripts/project-memory.py` (the v3.2 `__file__`-relative path
-  broke after the split).
+- Grounding imports `agent_memory.features.entries.command` as an optional
+  package dependency and uses its `filter_lines_for_injection`; missing or
+  broken agent-memory degrades to unfiltered memory-bank lines.
 - Persisted method labels (`ollama-…`) come from `summarize.primary_label() /
   secondary_label()` — derived from the active model tag, env-aware,
   quantization suffix stripped. Do NOT hardcode label strings elsewhere.

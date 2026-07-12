@@ -2,7 +2,7 @@
 
 ``get_project_root`` resolves the project containing ``.memory-bank/`` (or the
 git toplevel) without depending on shell aliases. ``redact_sensitive`` strips
-likely secret-bearing lines before they reach project memory or cloud.
+likely secret-bearing lines before they reach agent memory or cloud.
 ``slugify`` produces filesystem-safe topic slugs. ``default_summaries_dir`` is
 the canonical location for archived PreCompact summaries — shared between the
 ``hygiene`` (rotate / cap) and ``precompact`` (write) features so they can
@@ -65,7 +65,7 @@ def get_project_root(start: str | Path | None = None) -> Path:
 
 
 def redact_sensitive(text: str) -> str:
-    """Redact likely secret-bearing lines before writing project memory."""
+    """Redact likely secret-bearing lines before writing agent memory."""
     clean_lines = []
     for line in text.splitlines():
         if SECRET_RE.search(line):

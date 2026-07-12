@@ -12,7 +12,7 @@ name into this module's namespace and defeat the monkeypatch.)
 
 PreCompact hook output schema: only top-level ``continue`` / ``systemMessage`` /
 ``reason`` are accepted; ``hookSpecificOutput`` is rejected and silently
-discarded, so the summary is saved to the project memory bank and surfaced via
+discarded, so the summary is saved to the agent memory bank and surfaced via
 ``systemMessage``. ``memory-inject.sh`` reloads it on the next SessionStart.
 """
 
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -57,7 +58,7 @@ def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
     _archive_summary(summary_text, method, trigger, session_id)
     # Rotate AFTER writing so the "keep newest N" invariant holds.
     _hygiene.cleanup_old_summaries()
-    _writer.update_project_memory(summary_text, method, session_id, project_root=project_root)
+    _writer.update_agent_memory(summary_text, method, session_id, project_root=project_root)
 
     return _final_message(method, trigger, _hygiene.check_memory_hygiene())
 
@@ -107,7 +108,7 @@ def _minimal_handoff(session_id: str, trigger: str) -> str:
     return (
         f"**Task**: Session {session_id} compacted ({trigger})\n"
         "**Notes**: No session JSONL available; using minimal handoff.\n"
-        "**Next**: Reload from project memory bank if needed."
+        "**Next**: Reload from agent memory bank if needed."
     )
 
 
@@ -176,9 +177,12 @@ def _archive_summary(summary_text: str, method: str, trigger: str, session_id: s
     try:
         summary_dir = _paths.default_summaries_dir()
         summary_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        summary_file = summary_dir / f"{session_id}-{timestamp}.md"
-        header = f"<!-- {datetime.now().isoformat()} | {method} | trigger={trigger} -->\n\n"
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d-%H%M%S-%f")
+        session_label = _paths.slugify(str(session_id))[:80]
+        nonce = secrets.token_hex(4)
+        summary_file = summary_dir / f"{session_label}-{timestamp}-{nonce}.md"
+        header = f"<!-- {now.isoformat()} | {method} | trigger={trigger} -->\n\n"
         summary_file.write_text(header + summary_text, encoding="utf-8")
     except Exception:
         # Summary archive is best-effort; never block compaction.

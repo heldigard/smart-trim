@@ -1,1 +1,1 @@
-"""Writer feature: persist handoff to the project memory bank + topic index."""
+"""Writer feature: persist handoff to the agent memory bank + topic index."""

@@ -40,6 +40,29 @@ def test_cleanup_enforces_max_files(tmp_path):
     assert len(remaining) == 2  # newest 2 kept
 
 
+def test_cleanup_caps_readable_files_when_one_stat_fails(tmp_path, monkeypatch):
+    summaries = tmp_path / "summaries"
+    summaries.mkdir()
+    unreadable = summaries / "unreadable.md"
+    _touch(unreadable)
+    readable = [summaries / f"s{i}.md" for i in range(4)]
+    for path in readable:
+        _touch(path)
+    original_stat = Path.stat
+
+    def fake_stat(self, *args, **kwargs):
+        if self == unreadable:
+            raise OSError("permission denied")
+        return original_stat(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", fake_stat)
+
+    hygiene.cleanup_old_summaries(max_age_days=30, max_files=2, summary_dir=summaries)
+
+    assert unreadable in list(summaries.iterdir())
+    assert sum(path.exists() for path in readable) == 2
+
+
 def test_cleanup_noop_when_dir_missing(tmp_path):
     # No summaries dir -> returns silently.
     hygiene.cleanup_old_summaries(summary_dir=tmp_path / "nope")  # must not raise

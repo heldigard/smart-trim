@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,8 @@ from typing import Any
 # and tests import it from the session package. The implementation lives in
 # content.py (extraction is a separate responsibility from discovery).
 from smart_trim.features.session.content import extract_context_for_summary
+
+_SAFE_SESSION_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 
 
 def find_latest_session_jsonl() -> Path | None:
@@ -36,8 +39,6 @@ def find_latest_session_jsonl() -> Path | None:
     if not _has_claude_session_env():
         return None
     projects_root = Path.home() / ".claude" / "projects"
-    if not projects_root.is_dir():
-        return None
     all_jsonl = _collect_project_jsonls(projects_root)
     if not all_jsonl:
         return None
@@ -56,10 +57,27 @@ def _has_claude_session_env() -> bool:
 
 def _collect_project_jsonls(projects_root: Path) -> list[Path]:
     out: list[Path] = []
-    for project_dir in projects_root.iterdir():
-        if project_dir.is_dir():
+    for project_dir in _project_dirs(projects_root):
+        try:
             out.extend(project_dir.glob("*.jsonl"))
+        except OSError:
+            continue
     return out
+
+
+def _project_dirs(projects_root: Path) -> list[Path]:
+    """List readable project directories without failing the whole lookup."""
+    directories: list[Path] = []
+    try:
+        for entry in projects_root.iterdir():
+            try:
+                if entry.is_dir():
+                    directories.append(entry)
+            except OSError:
+                continue
+    except OSError:
+        return directories
+    return directories
 
 
 def get_session_file(input_data: dict[str, Any] | None = None) -> Path | None:
@@ -79,8 +97,9 @@ def get_session_file(input_data: dict[str, Any] | None = None) -> Path | None:
 
 def _resolve_from_stdin(input_data: dict[str, Any]) -> Path | None:
     """Resolve a session file from the stdin payload (sessionId + cwd)."""
-    session_id = input_data.get("sessionId") or os.environ.get("CLAUDE_SESSION_ID")
+    raw_session_id = input_data.get("sessionId") or os.environ.get("CLAUDE_SESSION_ID")
     cwd = input_data.get("cwd") or os.environ.get("PWD", str(Path.cwd()))
+    session_id = _validated_session_id(raw_session_id)
     if not (session_id and cwd):
         return None
     candidate = _candidate_from_cwd(session_id, cwd)
@@ -91,24 +110,37 @@ def _resolve_from_stdin(input_data: dict[str, Any]) -> Path | None:
 
 def _candidate_from_cwd(session_id: str, cwd: str) -> Path | None:
     """Build the session JSONL path from cwd's encoded project dir."""
-    resolved = str(Path(cwd).resolve())
+    validated_session_id = _validated_session_id(session_id)
+    if validated_session_id is None:
+        return None
+    try:
+        resolved = str(Path(cwd).resolve())
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return None
     encoded = "-" + resolved.lstrip("/").replace("/", "-")
-    candidate = Path.home() / ".claude" / "projects" / encoded / f"{session_id}.jsonl"
+    candidate = Path.home() / ".claude" / "projects" / encoded / f"{validated_session_id}.jsonl"
     return candidate if candidate.exists() else None
 
 
 def _search_session_id_all_projects(session_id: str) -> Path | None:
     """cwd may not match the session's project dir — search all projects."""
-    projects_root = Path.home() / ".claude" / "projects"
-    if not projects_root.is_dir():
+    validated_session_id = _validated_session_id(session_id)
+    if validated_session_id is None:
         return None
-    for project_dir in projects_root.iterdir():
-        if not project_dir.is_dir():
-            continue
-        sid_candidate = project_dir / f"{session_id}.jsonl"
+    projects_root = Path.home() / ".claude" / "projects"
+    for project_dir in _project_dirs(projects_root):
+        sid_candidate = project_dir / f"{validated_session_id}.jsonl"
         if sid_candidate.exists():
             return sid_candidate
     return None
+
+
+def _validated_session_id(value: Any) -> str | None:
+    """Return a filename-safe Claude session ID, rejecting lossy mappings."""
+    if value is None:
+        return None
+    session_id = str(value)
+    return session_id if _SAFE_SESSION_ID_RE.fullmatch(session_id) else None
 
 
 def get_session_id(input_data: dict[str, Any] | None = None) -> str:

@@ -16,7 +16,7 @@ def test_load_grounding_empty_when_no_bank(tmp_path):
 
 
 def test_load_grounding_reads_current_task(tmp_path, monkeypatch):
-    monkeypatch.setattr(grounding, "_load_project_memory", lambda: None)
+    monkeypatch.setattr(grounding, "_agent_memory_entries", None)
     bank = tmp_path / ".memory-bank"
     bank.mkdir()
     (bank / "currentTask.md").write_text("# Task\nfix the parser", encoding="utf-8")
@@ -27,12 +27,9 @@ def test_load_grounding_reads_current_task(tmp_path, monkeypatch):
 
 
 def test_load_grounding_filters_stale_active_entries(tmp_path, monkeypatch):
-    monkeypatch.setenv("MEMORY_INJECTION_ACTIVE_WINDOW_HOURS", "12")
-    monkeypatch.setattr(grounding, "_load_project_memory", lambda: None)
-
-    class _StubHelper:
+    class _StubAgentMemoryEntries:
         def filter_lines_for_injection(self, name, lines):
-            # Simulate the real helper dropping status:active lines older than the window.
+            # Simulate agent-memory dropping an expired active entry.
             return [ln for ln in lines if "stale" not in ln]
 
     bank = tmp_path / ".memory-bank"
@@ -42,7 +39,7 @@ def test_load_grounding_filters_stale_active_entries(tmp_path, monkeypatch):
         "- 2026-01-01T00:00:00Z | status:live | live task\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(grounding, "_load_project_memory", lambda: _StubHelper())
+    monkeypatch.setattr(grounding, "_agent_memory_entries", _StubAgentMemoryEntries())
 
     out = grounding.load_memory_grounding(tmp_path)
     assert "stale task" not in out
@@ -50,7 +47,7 @@ def test_load_grounding_filters_stale_active_entries(tmp_path, monkeypatch):
 
 
 def test_load_grounding_redacts_secrets(tmp_path, monkeypatch):
-    monkeypatch.setattr(grounding, "_load_project_memory", lambda: None)
+    monkeypatch.setattr(grounding, "_agent_memory_entries", None)
     bank = tmp_path / ".memory-bank"
     bank.mkdir()
     fake_key = "ABCDEF" + "123456"
@@ -195,7 +192,7 @@ def test_objective_registry_skips_foreign_project(tmp_path, monkeypatch):
 
 
 def test_load_grounding_read_text_oserror(tmp_path, monkeypatch):
-    monkeypatch.setattr(grounding, "_load_project_memory", lambda: None)
+    monkeypatch.setattr(grounding, "_agent_memory_entries", None)
     bank = tmp_path / ".memory-bank"
     bank.mkdir()
     task_file = bank / "currentTask.md"
@@ -213,23 +210,23 @@ def test_load_grounding_read_text_oserror(tmp_path, monkeypatch):
     assert "Current Task" not in out
 
 
-def test_load_grounding_helper_exception(tmp_path, monkeypatch):
+def test_load_grounding_agent_memory_exception(tmp_path, monkeypatch):
     bank = tmp_path / ".memory-bank"
     bank.mkdir()
     task_file = bank / "currentTask.md"
     task_file.write_text("line one\nline two", encoding="utf-8")
 
-    class BadHelper:
+    class BrokenAgentMemoryEntries:
         def filter_lines_for_injection(self, name, lines):
-            raise RuntimeError("helper failed")
+            raise RuntimeError("agent-memory filter failed")
 
-    monkeypatch.setattr(grounding, "_load_project_memory", lambda: BadHelper())
+    monkeypatch.setattr(grounding, "_agent_memory_entries", BrokenAgentMemoryEntries())
     out = grounding.load_memory_grounding(tmp_path)
     assert "line one" in out
 
 
 def test_load_grounding_from_end_slice(tmp_path, monkeypatch):
-    monkeypatch.setattr(grounding, "_load_project_memory", lambda: None)
+    monkeypatch.setattr(grounding, "_agent_memory_entries", None)
     bank = tmp_path / ".memory-bank"
     bank.mkdir()
     long_text = "A" * 500 + "B" * 1000
@@ -240,32 +237,6 @@ def test_load_grounding_from_end_slice(tmp_path, monkeypatch):
     # Only the last 1000 characters should be in the output
     assert "A" not in out
     assert "B" in out
-
-
-def test_load_project_memory_real_load(tmp_path, monkeypatch):
-    # Reset the cache
-    monkeypatch.setattr(grounding, "_PROJECT_MEMORY", None)
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-
-    # 1. file does not exist
-    assert grounding._load_project_memory() is None
-
-    # 2. file exists but spec or loader fails
-    scripts_dir = tmp_path / ".claude" / "scripts"
-    scripts_dir.mkdir(parents=True)
-    pm_file = scripts_dir / "project-memory.py"
-    pm_file.write_text(
-        "def filter_lines_for_injection(name, lines):\n    return ['filtered']\n",
-        encoding="utf-8",
-    )
-
-    # This should load successfully and cache it
-    helper = grounding._load_project_memory()
-    assert helper is not None
-    assert helper.filter_lines_for_injection("name", []) == ["filtered"]
-
-    # Call again, should return cached
-    assert grounding._load_project_memory() is helper
 
 
 def test_is_constraint_candidate_lengths():
@@ -350,22 +321,3 @@ def test_same_or_nested_project_unrelated(tmp_path):
     other = tmp_path / "other-project"
     other.mkdir()
     assert grounding._same_or_nested_project(str(other), tmp_path) is False
-
-
-def test_load_project_memory_spec_fails(tmp_path, monkeypatch):
-    import importlib.util
-
-    # Reset the cache
-    monkeypatch.setattr(grounding, "_PROJECT_MEMORY", None)
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-
-    # Create the script file so is_file() passes
-    scripts_dir = tmp_path / ".claude" / "scripts"
-    scripts_dir.mkdir(parents=True)
-    (scripts_dir / "project-memory.py").write_text(
-        "def filter_lines_for_injection(name, lines):\n    return ['filtered']\n", encoding="utf-8"
-    )
-
-    # Mock spec_from_file_location to return None
-    monkeypatch.setattr(importlib.util, "spec_from_file_location", lambda *a, **k: None)
-    assert grounding._load_project_memory() is None

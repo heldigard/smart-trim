@@ -124,6 +124,22 @@ def test_extract_context_newest_first_within_cap():
     assert "[USER]" in ctx
 
 
+def test_extract_context_counts_separators_in_exact_cap():
+    messages = [_msg("user", "aaaa"), _msg("assistant", "bbbb")]
+
+    context_value = session.extract_context_for_summary(messages, max_length=29)
+
+    assert context_value == "[ASSISTANT]: bbbb"
+    assert len(context_value) <= 29
+
+
+def test_extract_context_non_positive_cap_is_empty():
+    messages = [_msg("user", "keep out")]
+
+    assert session.extract_context_for_summary(messages, max_length=0) == ""
+    assert session.extract_context_for_summary(messages, max_length=-1) == ""
+
+
 def test_extract_context_skips_non_conversation_types():
     msgs = [
         {"type": "last-prompt", "message": {"role": "user", "content": "skip"}},
@@ -222,6 +238,23 @@ def test_find_latest_session_jsonl_resolves_newest(monkeypatch, tmp_path):
     assert session.find_latest_session_jsonl() is None
 
 
+def test_find_latest_session_jsonl_handles_unreadable_projects_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_SESSION_ID", "sess-1")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    projects_dir = tmp_path / ".claude" / "projects"
+    projects_dir.mkdir(parents=True)
+    original_iterdir = Path.iterdir
+
+    def fake_iterdir(self):
+        if self == projects_dir:
+            raise OSError("permission denied")
+        return original_iterdir(self)
+
+    monkeypatch.setattr(Path, "iterdir", fake_iterdir)
+
+    assert session.find_latest_session_jsonl() is None
+
+
 def test_get_session_file_resolves_from_stdin(monkeypatch, tmp_path):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     projects_dir = tmp_path / ".claude" / "projects"
@@ -254,6 +287,44 @@ def test_get_session_file_resolves_from_stdin(monkeypatch, tmp_path):
     # Search all projects when session does not exist
     input_data_not_found = {"sessionId": "sess-999", "cwd": "/other/path"}
     assert session.get_session_file(input_data_not_found) is None
+
+
+def test_get_session_file_rejects_path_traversal_session_id(monkeypatch, tmp_path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.delenv("CLAUDE_SESSION_FILE", raising=False)
+    monkeypatch.delenv("CLAUDE_SESSION_ID", raising=False)
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    project_dir = tmp_path / ".claude" / "projects" / "project"
+    project_dir.mkdir(parents=True)
+    escaped = tmp_path / ".claude" / "escaped.jsonl"
+    escaped.write_text("{}\n", encoding="utf-8")
+
+    result = session.get_session_file(
+        {"sessionId": "../../escaped", "cwd": "/definitely/not/the/project"}
+    )
+
+    assert result is None
+
+
+def test_session_search_skips_unreadable_project_entry(monkeypatch, tmp_path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    projects_dir = tmp_path / ".claude" / "projects"
+    bad = projects_dir / "bad"
+    good = projects_dir / "good"
+    bad.mkdir(parents=True)
+    good.mkdir()
+    expected = good / "sess-1.jsonl"
+    expected.write_text("{}\n", encoding="utf-8")
+    original_is_dir = Path.is_dir
+
+    def fake_is_dir(self):
+        if self == bad:
+            raise OSError("permission denied")
+        return original_is_dir(self)
+
+    monkeypatch.setattr(Path, "is_dir", fake_is_dir)
+
+    assert session._search_session_id_all_projects("sess-1") == expected
 
 
 def test_content_extraction_edge_cases():

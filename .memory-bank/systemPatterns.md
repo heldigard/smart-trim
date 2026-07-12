@@ -22,8 +22,8 @@ is one end-to-end PreCompact pipeline).
    rule-based fallback.
 2. `handle_precompact` uses late binding (`_sum.summarize_primary()`) so pytest
    `monkeypatch.setattr` on origin modules works post-split.
-3. `_load_project_memory` uses absolute `~/.claude/scripts/project-memory.py`
-   (the `__file__`-relative path broke).
+3. Grounding uses the installed agent-memory package for freshness filtering;
+   it never loads memory helpers by absolute script path.
 
 **Alternatives rejected**:
 - Keep as hook-internal package under `~/.claude/hooks/smart_trim/` — less
@@ -55,4 +55,20 @@ Audit caught: README + `_try_local` disagreed with the actual model order; the e
 - Label derivation: tests no longer hard-code the literal method strings; assertions now compare against `primary_label()/secondary_label()`. A future model swap (different default tag) propagates automatically.
 - Nested match: the test suite now covers all three cases (equal, nested, sibling).
 
-- 2026-07-06T22:58:02Z | status:active | Memory hygiene: runtime instructions from compaction hooks and worker wrappers are not durable project memory. Filter FUSION_PANEL/CODEX_WORKER/NO_DELEGATE/NO_TOOLS/NO_SWARM markers and generic post-compact 'DO NOT re-read...' guidance from negative constraint extraction; preserve real user/project constraints such as 'Never read .env files.'
+- 2026-07-06T22:58:02Z | status:active | Memory hygiene: runtime instructions from compaction hooks and worker wrappers are not durable agent memory. Filter FUSION_PANEL/CODEX_WORKER/NO_DELEGATE/NO_TOOLS/NO_SWARM markers and generic post-compact 'DO NOT re-read...' guidance from negative constraint extraction; preserve real user/project constraints such as 'Never read .env files.'
+
+## 2026-07-12 — Recovery-boundary hardening
+
+**Decision**: Treat hook payload metadata and optional harness/filesystem state as
+untrusted recovery inputs. Session IDs used for lookup are strictly validated
+before filename construction; archive labels are separately sanitized and
+uniquified. Per-entry filesystem/helper failures degrade locally instead of
+escaping to the top-level no-op fallback.
+
+**Why**: PreCompact must fail open without unnecessarily losing the handoff. A
+malformed session ID could previously escape the archive directory or session
+store, while one unreadable project/archive entry or a broken optional helper
+could cancel otherwise recoverable work.
+
+**Invariant**: Bounds described by configuration are exact (including joining
+separators), and deterministic fallback output preserves first occurrence order.
