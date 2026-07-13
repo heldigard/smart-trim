@@ -133,6 +133,52 @@ def test_foreign_session_false_when_no_paths(tmp_path):
     assert writer._is_foreign_session("just thinking about the design", tmp_path) is False
 
 
+# --- HOME meta bank: name/home guard (bug 2026-07-13) -----------------------
+# A project session run from ~ pollutes the shared meta activeContext when its
+# summary names the project without any absolute path. The HOME meta bank must
+# route such sessions to the foreign topic.
+
+
+def test_home_bank_foreign_when_names_known_project(monkeypatch, tmp_path):
+    monkeypatch.setattr(writer, "_is_home_meta_bank", lambda root: True)
+    monkeypatch.setattr(writer, "_known_project_names", lambda: {"elogix"})
+    summary = "revisa los flujos de elogix-api y elogix-web: DeliveryOrder CRUD"
+    assert writer._is_foreign_session(summary, tmp_path) is True
+
+
+def test_home_bank_foreign_when_no_signal_no_project(monkeypatch, tmp_path):
+    monkeypatch.setattr(writer, "_is_home_meta_bank", lambda root: True)
+    monkeypatch.setattr(writer, "_known_project_names", lambda: set())
+    assert writer._is_foreign_session("explain how async works", tmp_path) is True
+
+
+def test_home_bank_not_foreign_when_meta_signal(monkeypatch, tmp_path):
+    monkeypatch.setattr(writer, "_is_home_meta_bank", lambda root: True)
+    monkeypatch.setattr(writer, "_known_project_names", lambda: {"elogix"})
+    summary = "reviewed the smart-trim hook and the skill-router rule"
+    assert writer._is_foreign_session(summary, tmp_path) is False
+
+
+def test_home_bank_tilde_path_treated_as_inside():
+    # A meta session editing ~/.claude/... must count as inside the HOME root,
+    # not extract a misleading "/.claude/..." path that looks foreign.
+    summary = "edited ~/.claude/hooks/smart-trim.py and ~/.codex/config.toml"
+    assert writer._is_foreign_session(summary, Path.home()) is False
+
+
+def test_home_bank_routes_named_project_to_foreign_topic(monkeypatch, tmp_path):
+    project = tmp_path / "host"
+    project.mkdir()
+    monkeypatch.setattr(writer, "_is_home_meta_bank", lambda root: True)
+    monkeypatch.setattr(writer, "_known_project_names", lambda: {"elogix"})
+    summary = "audited elogix-api auth flow and elogix-web state progression"
+    writer.update_agent_memory(summary, "fallback", "sess-elogix", project_root=project)
+    foreign = project / ".memory-bank" / "topics" / "foreign-sessions.md"
+    active = project / ".memory-bank" / "activeContext.md"
+    assert foreign.exists()
+    assert not active.exists()  # meta activeContext NOT clobbered
+
+
 def test_write_active_limits_lines(tmp_path):
     project = tmp_path / "proj"
     project.mkdir()

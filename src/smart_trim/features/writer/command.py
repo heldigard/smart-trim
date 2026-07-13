@@ -97,23 +97,123 @@ def update_topic_index(topics_dir: Path, slug: str, title: str) -> None:
             handle.write(f"- [{title}]({slug}.md)\n")
 
 
+# Harness/meta signals. The HOME meta bank is a catch-all for sessions launched
+# from ~, so a home-rooted session is meta (not foreign) ONLY when its summary
+# references the harness itself. Otherwise project work described by NAME (no
+# absolute path) clobbers the shared meta activeContext. (Bug fixed 2026-07-13:
+# an elogix Codex session run from home polluted the meta bank because its
+# summary named the project without any absolute path.)
+_META_SIGNALS = (
+    ".claude",
+    ".codex",
+    ".gemini",
+    ".kimi",
+    ".qwen",
+    ".opencode",
+    "hooks/",
+    "skills/",
+    "rules/",
+    "settings.json",
+    "config.toml",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "agent-memory",
+    "skill-router",
+    "fusion-local",
+    "fusion",
+    "cli-orchestration",
+    "cheap-llm",
+    "prompt-improve",
+    "smart-trim",
+    "codeq",
+    "codescan",
+    "web-research",
+    "ollama-client",
+    "memory-bank",
+)
+
+# Parents whose immediate children are real project roots. Used to confirm a
+# foreign session by project NAME when the summary carries no absolute path.
+# Bounded to one readdir per parent; guarded so a slow/unmounted volume cannot
+# block compaction.
+_PROJECT_PARENTS = (
+    "/mnt/wsl/PHYSICALDRIVE2p1",
+    "/mnt/wsl/PHYSICALDRIVE2p1/ProyectosGP",
+    "/mnt/ext4disk/ProyectosP",
+    "/mnt/c/Users",
+)
+
+
+def _is_home_meta_bank(project_root: Path) -> bool:
+    """True when the bank root IS the user home (the shared meta/home bank)."""
+    try:
+        return project_root.resolve() == Path.home().resolve()
+    except OSError:
+        return False
+
+
+def _child_bank_name(child: Path) -> str | None:
+    """Lowercased basename if ``child`` is a project dir with its own bank."""
+    try:
+        if child.is_dir() and (child / ".memory-bank").is_dir():
+            return child.name.lower()
+    except OSError:
+        return None
+    return None
+
+
+def _known_project_names() -> set[str]:
+    """Lowercased basenames of project dirs (outside $HOME) with their own bank."""
+    names: set[str] = set()
+    for parent in _PROJECT_PARENTS:
+        pdir = Path(parent)
+        if not pdir.is_dir():
+            continue
+        try:
+            children = list(pdir.iterdir())
+        except OSError:
+            continue
+        for child in children:
+            name = _child_bank_name(child)
+            if name:
+                names.add(name)
+    return names
+
+
 def _is_foreign_session(summary: str, project_root: Path) -> bool:
     """True when the session touches files outside this bank's project root.
 
-    Extract absolute paths from the summary. If at least one path exists and NONE
-    fall under project_root, the session is foreign (e.g. working on
-    /mnt/wsl/.../Elogix from a ~ host dir). Sessions with no paths (conceptual
-    work) are treated as host-local — keep writing them.
+    Absolute-path detection first: if the summary carries any path and none fall
+    under project_root, the session is foreign (e.g. working on
+    /mnt/wsl/.../Elogix from a ~ host dir).
+
+    Name/home guard: a HOME-rooted session (the shared meta bank) is foreign
+    unless its summary references the harness. This stops project work described
+    only by name from overwriting the meta activeContext.
     """
     try:
         root = str(project_root.resolve())
     except OSError:
         root = str(project_root)
-    paths = re.findall(r"/[A-Za-z0-9._/-]+\.[A-Za-z0-9]+", summary)
-    paths += re.findall(r"[A-Za-z]:\\[A-Za-z0-9._\\-]+", summary)
-    if not paths:
+    # Expand ~ and $HOME so a meta session editing ~/.claude/... is recognized as
+    # inside the HOME root instead of extracting a misleading "/.claude/..." path.
+    probe = summary.replace("~", str(Path.home())).replace("$HOME", str(Path.home()))
+    paths = re.findall(r"/[A-Za-z0-9._/-]+\.[A-Za-z0-9]+", probe)
+    paths += re.findall(r"[A-Za-z]:\\[A-Za-z0-9._\\-]+", probe)
+    if paths:
+        return not _any_path_under_root(paths, root)
+    # No absolute paths. Only the HOME meta bank needs the extra guard: a normal
+    # project bank is already scoped correctly by its directory.
+    if not _is_home_meta_bank(project_root):
         return False
-    return not _any_path_under_root(paths, root)
+    low = summary.lower()
+    if any(sig in low for sig in _META_SIGNALS):
+        return False  # genuine harness/meta work launched from home
+    if any(name and name in low for name in _known_project_names()):
+        return True  # names a real project that has its own bank
+    # Home-rooted, no path, no meta signal, no known project name: route to the
+    # foreign topic rather than risk clobbering the shared meta activeContext.
+    return True
 
 
 def _any_path_under_root(paths: list[str], root: str) -> bool:
