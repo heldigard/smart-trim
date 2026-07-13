@@ -26,6 +26,7 @@ def test_get_session_id_unknown_default(monkeypatch):
     monkeypatch.delenv("CLAUDE_SESSION_ID", raising=False)
     assert session.get_session_id() == "unknown"
     assert session.get_session_id({}) == "unknown"
+    assert session.get_session_id({"session_id": "codex-session"}) == "codex-session"
 
 
 # --- read_session ------------------------------------------------------------
@@ -175,6 +176,23 @@ def test_get_session_file_env_var_wins(monkeypatch, tmp_path):
     monkeypatch.delenv("CLAUDE_SESSION_ID", raising=False)
     monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
     assert session.get_session_file({}) == f
+
+
+def test_get_session_file_accepts_codex_transcript_path(monkeypatch, tmp_path):
+    monkeypatch.delenv("CLAUDE_SESSION_FILE", raising=False)
+    transcript = tmp_path / "codex-session.jsonl"
+    transcript.write_text("{}\n", encoding="utf-8")
+
+    assert session.get_session_file({"transcript_path": str(transcript)}) == transcript
+
+
+def test_get_session_file_rejects_non_jsonl_transcript(monkeypatch, tmp_path):
+    monkeypatch.delenv("CLAUDE_SESSION_FILE", raising=False)
+    transcript = tmp_path / "codex-session.txt"
+    transcript.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(session, "find_latest_session_jsonl", lambda: None)
+
+    assert session.get_session_file({"transcript_path": str(transcript)}) is None
 
 
 def test_get_session_file_falls_back_to_latest(monkeypatch):

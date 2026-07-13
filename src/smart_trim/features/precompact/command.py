@@ -27,9 +27,11 @@ from pathlib import Path
 from typing import Any
 
 from smart_trim import __version__
+from smart_trim.features.capabilities import command as _capabilities
 from smart_trim.features.fallback import command as _fallback
 from smart_trim.features.grounding import command as _grounding
 from smart_trim.features.hygiene import command as _hygiene
+from smart_trim.features.precompact import policy as _policy
 from smart_trim.features.session import command as _session
 from smart_trim.features.summarize import command as _summarize
 from smart_trim.features.writer import command as _writer
@@ -50,6 +52,12 @@ def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
     session_id = _session.get_session_id(input_data)
 
     summary_text, method, preserved = _resolve_summary(session_file, grounding, session_id, trigger)
+    if _policy.is_unusable_minimal(summary_text, method, objective_block):
+        # Never replace a useful durable handoff with "session unknown / no
+        # JSONL". This occurs when a hook fires outside Claude or the runtime
+        # omits its transcript. Preserving the previous activeContext is more
+        # informative than writing a synthetic empty summary.
+        return _policy.skipped_message(trigger)
     summary_text = _augment(summary_text, preserved, objective_block)
     # One sanitized representation feeds every persistence sink. Previously the
     # standalone archive received raw model/session text before writer redaction.
@@ -214,6 +222,8 @@ def main() -> None:
     """Main hook entry point for PreCompact event."""
     if sys.argv[1:] == ["--version"]:
         print(f"smart-trim {__version__}")
+        return
+    if _capabilities.handle_cli(sys.argv[1:]):
         return
     try:
         input_data = json.load(sys.stdin)

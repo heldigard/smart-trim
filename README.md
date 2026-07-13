@@ -1,6 +1,7 @@
 # smart-trim
 
-LLM-powered **PreCompact** context-compression hook for Claude Code. Compresses
+LLM-powered **PreCompact** context-compression hook for Claude Code, with
+Codex-compatible payload aliases. Compresses
 the active session into a compact handoff (`Task / Acceptance / Verified /
 Current / Errors / Decisions / Next / Files`) grounded in the agent memory
 bank, so compaction preserves the real objective instead of drifting.
@@ -28,6 +29,8 @@ Vertical-slice package (`src/smart_trim/{shared,features}/`), graduated from a
 ```bash
 pip install -e ~/agent-memory
 pip install -e ~/smart-trim
+smart-trim --help
+smart-trim capabilities --json
 python3 -m pytest ~/smart-trim/tests/ -q
 ```
 
@@ -38,7 +41,10 @@ smart-trim keeps the raw memory lines and compaction continues.
 ## Wire (already wired — do not change)
 
 `~/.claude/settings.json` → `"python3 ~/.claude/hooks/smart-trim.py"` on
-`PreCompact`. Gemini reaches it via `~/.gemini/hooks/smart-trim.py` symlink.
+`PreCompact`. Gemini reaches it via `~/.gemini/hooks/smart-trim.py` symlink;
+Codex wires the same shim from `~/.codex/hooks.json`. When a runtime supplies
+no transcript or live objective, the hook preserves the existing handoff
+instead of overwriting it with an empty synthetic summary.
 
 ## Version
 

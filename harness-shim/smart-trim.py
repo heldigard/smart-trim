@@ -3,9 +3,8 @@
 
 The shim bootstraps the source tree directly, so it still works when a worker
 uses an isolated ``HOME`` and Python cannot see user-site editable installs.
-This preserves the wired path ``~/.claude/hooks/smart-trim.py`` so
-``~/.claude/settings.json`` (PreCompact) and the Gemini symlink
-``~/.gemini/hooks/smart-trim.py`` keep resolving untouched.
+This preserves the wired path ``~/.claude/hooks/smart-trim.py`` so Claude,
+Codex, and the Gemini symlink keep resolving the same PreCompact entrypoint.
 
 Source of truth: ``~/smart-trim/src/smart_trim/``. History/changelog there.
 If the package ever fails to import, fail OPEN (never block compaction).

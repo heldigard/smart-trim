@@ -75,10 +75,12 @@ def test_injects_negative_constraints_into_grounding(tmp_path, monkeypatch):
 # --- payload cwd drives memory write (from original test suite) -------------
 
 
-def test_uses_payload_cwd_for_memory_write(tmp_path, monkeypatch):
+def test_no_transcript_preserves_existing_project_handoff(tmp_path, monkeypatch):
     home = tmp_path / "home"
     project = tmp_path / "project"
     (project / ".memory-bank").mkdir(parents=True)
+    active = project / ".memory-bank" / "activeContext.md"
+    active.write_text("# Active Context\n- valuable prior handoff\n", encoding="utf-8")
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("CLAUDE_SESSION_FILE", raising=False)
     monkeypatch.delenv("CLAUDE_SESSION_ID", raising=False)
@@ -97,9 +99,7 @@ def test_uses_payload_cwd_for_memory_write(tmp_path, monkeypatch):
     )
 
     assert result == {"continue": True}
-    active = project / ".memory-bank" / "activeContext.md"
-    assert active.exists()
-    assert "Session sess-1 compacted" in active.read_text(encoding="utf-8")
+    assert active.read_text(encoding="utf-8") == "# Active Context\n- valuable prior handoff\n"
     assert not (home / ".memory-bank" / "activeContext.md").exists()
 
 
@@ -220,13 +220,18 @@ def test_minimal_handoff_when_no_session(tmp_path, monkeypatch):
         lambda summary, method, session_id="unknown", project_root=None: seen.update(method=method),
     )
 
-    precompact.handle_precompact({"trigger": "auto", "sessionId": "sx", "cwd": str(project)})
-    assert seen["method"] == "minimal"
+    result = precompact.handle_precompact(
+        {"trigger": "auto", "sessionId": "sx", "cwd": str(project)}
+    )
+    assert seen == {}
+    assert "preserved existing" in result["systemMessage"]
 
 
 def test_precompact_does_not_persist_postcompact_rules(tmp_path, monkeypatch):
     project = tmp_path / "project"
     (project / ".memory-bank").mkdir(parents=True)
+    active_path = project / ".memory-bank" / "activeContext.md"
+    active_path.write_text("# Active Context\n- keep me\n", encoding="utf-8")
     _disable_external(monkeypatch)
     monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: None)
     monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
@@ -239,14 +244,12 @@ def test_precompact_does_not_persist_postcompact_rules(tmp_path, monkeypatch):
 
     precompact.handle_precompact({"trigger": "auto", "sessionId": "sx", "cwd": str(project)})
 
-    active = (project / ".memory-bank" / "activeContext.md").read_text(encoding="utf-8")
-    topic = (project / ".memory-bank" / "topics" / "session-handoffs.md").read_text(
-        encoding="utf-8"
-    )
+    active = active_path.read_text(encoding="utf-8")
+    topic_path = project / ".memory-bank" / "topics" / "session-handoffs.md"
     assert "POST-COMPACT RULES" not in active
     assert "DO NOT re-read files" not in active
-    assert "POST-COMPACT RULES" not in topic
-    assert "DO NOT re-read files" not in topic
+    assert active == "# Active Context\n- keep me\n"
+    assert not topic_path.exists()
 
 
 # --- return shape -----------------------------------------------------------
@@ -400,6 +403,11 @@ def test_precompact_returns_warning_on_auto(tmp_path, monkeypatch):
     (project / ".memory-bank").mkdir(parents=True)
     _disable_external(monkeypatch)
     monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: None)
+    monkeypatch.setattr(
+        precompact,
+        "_build_grounding",
+        lambda root: ("current objective", "current objective"),
+    )
     monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
     monkeypatch.setattr(
         "smart_trim.features.hygiene.command.cleanup_old_summaries", lambda *a, **k: None
@@ -454,6 +462,36 @@ def test_precompact_version_does_not_read_stdin(monkeypatch, capsys):
     precompact.main()
 
     assert capsys.readouterr().out.strip() == "smart-trim 3.3.0"
+
+
+def test_precompact_help_is_discoverable_without_reading_stdin(monkeypatch, capsys):
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["smart-trim", "--help"])
+    monkeypatch.setattr(sys, "stdin", None)
+
+    precompact.main()
+
+    output = capsys.readouterr().out
+    assert "usage: smart-trim" in output
+    assert "capabilities" in output
+    assert "PreCompact" in output
+
+
+def test_precompact_capabilities_json_has_side_effect_contract(monkeypatch, capsys):
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["smart-trim", "capabilities", "--json"])
+    monkeypatch.setattr(sys, "stdin", None)
+
+    precompact.main()
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == 1
+    compact = next(item for item in payload["capabilities"] if item["name"] == "precompact")
+    assert compact["read_only"] is False
+    assert compact["writes"].startswith(".memory-bank/")
+    assert payload["degradation"].endswith("deterministic summary")
 
 
 def test_precompact_try_local_returns_none_none(monkeypatch):

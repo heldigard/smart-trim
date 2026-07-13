@@ -22,7 +22,9 @@ from smart_trim.shared.paths import redact_sensitive
 from smart_trim.shared.timeutil import hours_since_iso, objective_injection_window_hours
 
 try:
-    from agent_memory.features.entries import command as _agent_memory_entries
+    from agent_memory.features.entries import (  # pyright: ignore[reportMissingImports]
+        command as _agent_memory_entries,
+    )
 except Exception:  # pragma: no cover - optional environment dependency
     _agent_memory_entries = None  # type: ignore[assignment]
 

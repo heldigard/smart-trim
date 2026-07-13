@@ -86,18 +86,29 @@ def get_session_file(input_data: dict[str, Any] | None = None) -> Path | None:
     session_file = os.environ.get("CLAUDE_SESSION_FILE")
     if session_file and Path(session_file).exists():
         return Path(session_file)
-    # 2. Build from stdin sessionId + cwd (PreCompact fallback)
+    # 2. Use the transcript path provided by Claude/Codex hook payloads.
+    if input_data:
+        transcript = input_data.get("transcript_path") or input_data.get("transcriptPath")
+        if transcript:
+            candidate = Path(str(transcript)).expanduser()
+            if candidate.is_file() and candidate.suffix == ".jsonl":
+                return candidate
+    # 3. Build from stdin sessionId + cwd (Claude PreCompact fallback)
     if input_data:
         found = _resolve_from_stdin(input_data)
         if found is not None:
             return found
-    # 3. Last resort: most recent JSONL across all projects
+    # 4. Last resort: most recent JSONL across all Claude projects
     return find_latest_session_jsonl()
 
 
 def _resolve_from_stdin(input_data: dict[str, Any]) -> Path | None:
     """Resolve a session file from the stdin payload (sessionId + cwd)."""
-    raw_session_id = input_data.get("sessionId") or os.environ.get("CLAUDE_SESSION_ID")
+    raw_session_id = (
+        input_data.get("sessionId")
+        or input_data.get("session_id")
+        or os.environ.get("CLAUDE_SESSION_ID")
+    )
     cwd = input_data.get("cwd") or os.environ.get("PWD", str(Path.cwd()))
     session_id = _validated_session_id(raw_session_id)
     if not (session_id and cwd):
@@ -149,7 +160,7 @@ def get_session_id(input_data: dict[str, Any] | None = None) -> str:
     if sid:
         return sid
     if input_data:
-        sid = input_data.get("sessionId")
+        sid = input_data.get("sessionId") or input_data.get("session_id")
         if sid:
             return str(sid)
     return "unknown"
