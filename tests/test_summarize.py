@@ -77,25 +77,20 @@ def test_summarize_ollama_swallows_unavailable(monkeypatch):
 # --- summarize_primary / secondary ------------------------------------------
 
 
-def test_summarize_primary_uses_sc117_heretic_qat_model(monkeypatch):
-    """Round-10 2026-07-12 cross-task 4-way validation promoted
-    SC117/heretic-QAT (10.79) over HauhauCS-Balanced (9.87) in smart_trim."""
+def test_summarize_primary_uses_batiai_e2b_model(monkeypatch):
+    """Round-15 cross-validation: batiai-e2b (11.67) beats SC117 (10.79) on score."""
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_primary("ctx")
-    assert fake.calls[0]["model"] == "hf.co/SC117/gemma-4-12B-it-heretic-QAT-GGUF:UD-Q4_K_XL"
+    assert fake.calls[0]["model"] == "batiai/gemma4-e2b:q4"
 
 
-def test_summarize_secondary_uses_hauhau_cs_model(monkeypatch):
-    """Round-10 smart_trim FALLBACK: HauhauCS-Balanced (9.87) demoted from
-    round-7 champion to secondary in round-10 cross-task validation."""
+def test_summarize_secondary_uses_cryptidbleh_model(monkeypatch):
+    """Round-15 cross-validation runner-up: cryptidbleh (11.63) as fidelity fallback."""
     fake = _FakeOllamaClient(result="ok")
     monkeypatch.setattr(compat, "ollama_client", fake)
     summarize.summarize_secondary("ctx")
-    assert (
-        fake.calls[0]["model"]
-        == "hf.co/HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced:Q4_K_M"
-    )
+    assert fake.calls[0]["model"] == "cryptidbleh/gemma4-claude-opus-4.6:latest"
 
 
 # --- summarize_cloud_cascade ------------------------------------------------
@@ -176,26 +171,27 @@ def test_summarize_model_env_overrides(monkeypatch):
 
 
 def test_primary_label_strips_quantization_suffix():
-    """Round-10: primary label strips quant suffix from SC117/heretic-QAT
-    registry tag, producing a stable 'ollama-<bare-name>' hook label."""
+    """Round-15: primary label strips quant + vendor prefix from
+    batiai/gemma4-e2b:q4, producing a stable 'ollama-<bare-name>' hook label."""
     from smart_trim.features.summarize import command as sum_cmd
 
     label = sum_cmd.primary_label()
     assert label.startswith("ollama-")
-    # UD-Q4_K_XL + hf.co/ prefix + gemma-4-12B-it-heretic-QAT-GGUF → bare
-    # Original case preserved: "gemma-4-12B-it-heretic-QAT".
-    assert "gemma-4-12B-it-heretic-QAT" in label
-    # Quant / GGUF / hf.co prefix must be stripped.
-    assert "hf.co/" not in label
-    assert "UD-Q4_K_XL" not in label
+    # batiai/ prefix + :q4 quant stripped → bare "gemma4-e2b".
+    assert "gemma4-e2b" in label
+    # Quant suffix + vendor prefix must be stripped.
+    assert ":q4" not in label
+    assert "batiai/" not in label
 
 
 def test_secondary_label_uses_bare_tag():
     from smart_trim.features.summarize import command as sum_cmd
 
     label = sum_cmd.secondary_label()
-    # HauhauCS Q4_K_M → bare registry name (no quant, no prefix)
-    assert "hauhau" in label.lower() or "gemma-4-12b-qat" in label.lower()
+    # cryptidbleh/ prefix + :latest stripped → bare "gemma4-claude-opus-4.6".
+    assert "gemma4-claude-opus-4.6" in label
+    assert "cryptidbleh/" not in label
+    assert ":latest" not in label
 
 
 def test_labels_track_env_override(monkeypatch):
