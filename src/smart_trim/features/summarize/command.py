@@ -66,8 +66,14 @@ Format:
 **Files**: [list of all files touched]"""
 
 
-def summarize_ollama(context: str, model: str, grounding: str = "") -> str | None:
-    """Summarize using an Ollama local model (via shared ollama_client.chat)."""
+def summarize_ollama(
+    context: str, model: str, grounding: str = "", timeout: float = OLLAMA_TIMEOUT_SECONDS
+) -> str | None:
+    """Summarize using an Ollama local model (via shared ollama_client.chat).
+
+    ``timeout`` shrinks with the remaining cascade budget so a hung generation
+    cannot blow the PreCompact hook's wall-clock ceiling.
+    """
     if compat.ollama_client is None:
         return None
     prompt = get_summary_prompt(context, grounding=grounding)
@@ -89,20 +95,24 @@ def summarize_ollama(context: str, model: str, grounding: str = "") -> str | Non
             base_url=OLLAMA_BASE,
             cache=False,
             num_ctx=32768,
-            timeout=OLLAMA_TIMEOUT_SECONDS,
+            timeout=timeout,
         )
     except compat.ollama_client.OllamaUnavailable:
         return None
 
 
-def summarize_primary(context: str, grounding: str = "") -> str | None:
+def summarize_primary(
+    context: str, grounding: str = "", timeout: float = OLLAMA_TIMEOUT_SECONDS
+) -> str | None:
     """PRIMARY: batiai/gemma4-e2b (risk-weighted smart_trim #1)."""
-    return summarize_ollama(context, _PRIMARY_MODEL, grounding=grounding)
+    return summarize_ollama(context, _PRIMARY_MODEL, grounding=grounding, timeout=timeout)
 
 
-def summarize_secondary(context: str, grounding: str = "") -> str | None:
+def summarize_secondary(
+    context: str, grounding: str = "", timeout: float = OLLAMA_TIMEOUT_SECONDS
+) -> str | None:
     """SECONDARY: cryptidbleh, the fidelity-weighted runner-up."""
-    return summarize_ollama(context, _SECONDARY_MODEL, grounding=grounding)
+    return summarize_ollama(context, _SECONDARY_MODEL, grounding=grounding, timeout=timeout)
 
 
 def primary_label() -> str:
@@ -169,12 +179,15 @@ def _normalize_model_for_label(model: str) -> str:
     return model
 
 
-def summarize_cloud_cascade(context: str, grounding: str = "") -> str | None:
+def summarize_cloud_cascade(
+    context: str, grounding: str = "", timeout_total: float = 45.0
+) -> str | None:
     """TERTIARY: cheap_llm cloud cascade (secret-scrubbed, cross-provider failover).
 
     Only called when BOTH local Ollama models are unavailable. Context is scrubbed
     of secrets before leaving the machine. Returns None if all cloud tiers fail
-    (caller falls to rule-based).
+    (caller falls to rule-based). ``timeout_total`` shrinks with the remaining
+    cascade budget so a slow cloud tier cannot blow the PreCompact hook ceiling.
     """
     if compat.cheap_complete is None:
         return None
@@ -184,7 +197,7 @@ def summarize_cloud_cascade(context: str, grounding: str = "") -> str | None:
             system=_SYSTEM_PROMPT,
             prompt=prompt,
             schema_hint=None,
-            timeout_total=45.0,  # DeepSeek 1M ctx on a large context needs headroom
+            timeout_total=timeout_total,
             prefer_local=False,  # local primary+secondary already tried upstream
             require_json=False,  # summary is free text, not JSON
             cloud_model=_CLOUD_MODEL,  # judgment tier (env-overridable)

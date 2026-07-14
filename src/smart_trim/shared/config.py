@@ -59,15 +59,49 @@ except ValueError:
 # / root-causes in long sessions approaching compact.
 MAX_FALLBACK_SUMMARY = 3000  # Max chars for rule-based fallback
 
+# --- Cascade wall-clock budget ------------------------------------------------
+# Hard ceiling on the LLM cascade (local primary -> secondary -> cloud) so a
+# hung model can never exceed the PreCompact hook timeout and lose the ENTIRE
+# handoff (the cascade runs before any write, so a timeout-kill means nothing
+# is persisted). Each tier's per-call timeout shrinks with the remaining
+# budget; once it is exhausted the cascade fails OPEN to rule-based fallback.
+# Must stay below the host's PreCompact hook timeout; env-tunable.
+try:
+    CASCADE_BUDGET_SECONDS = float(os.environ.get("SMART_TRIM_CASCADE_BUDGET_SECONDS", "40"))
+except ValueError:
+    CASCADE_BUDGET_SECONDS = 40.0
+# Don't start a tier with less than this left — it would just fail and waste a
+# round-trip. Kept above the local generation floor so healthy summaries on a
+# warm model still complete.
+CASCADE_MIN_TIER_SECONDS = 3.0
+
 
 # --- Redaction / constraint patterns ---------------------------------------
-SECRET_RE = re.compile(
-    r"(api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|"
-    r"private[_-]?key|BEGIN [A-Z ]*PRIVATE KEY|sk-[A-Za-z0-9_-]{20,}|"
-    # High-confidence token prefixes (GitHub, GitLab, AWS, Slack, npm, Google, JWT).
+# Two-tier so a handoff keeps its context instead of losing whole lines.
+# `redact_sensitive` (paths.py) masks VALUE spans in place and masks from a
+# KEYWORD to end-of-line. Kept as separate compiled patterns (not one
+# alternation) so the redactor can treat the two tiers differently.
+#
+# High-confidence secret VALUES (prefixed tokens, PEM headers, JWTs): the regex
+# matches the secret material itself, so masking just the span removes the
+# secret while preserving the surrounding sentence.
+SECRET_VALUE_RE = re.compile(
+    r"("
+    r"BEGIN [A-Z ]*PRIVATE KEY|sk-[A-Za-z0-9_-]{20,}|"
     r"gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|glpat-[A-Za-z0-9_-]{20,}|"
     r"AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|npm_[A-Za-z0-9]{36}|"
-    r"AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\.eyJ)",
+    r"AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\.eyJ"
+    r")",
+    re.IGNORECASE,
+)
+
+# Loose keyword LABELS (api_key, password, secret, ...): the regex matches the
+# label, not the value, so the redactor masks from the keyword to end-of-line.
+# This still catches prose-form secrets ("the secret is hunter2") while keeping
+# the context before the keyword ("Decisions: rotate the" survives a line that
+# once read "Decisions: rotate the api_key weekly").
+SECRET_KEYWORD_RE = re.compile(
+    r"(api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|private[_-]?key)",
     re.IGNORECASE,
 )
 

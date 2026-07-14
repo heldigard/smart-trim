@@ -328,6 +328,50 @@ def test_redact_sensitive_keeps_plain_gh_words():
     assert paths.redact_sensitive("ghpages deploy ok") == "ghpages deploy ok"
 
 
+# --- redaction: two-tier precision (value-span + keyword->EOL) ---------------
+
+
+def test_redact_preserves_context_before_keyword():
+    # A decision that merely names a field keeps its context; the old
+    # whole-line redaction deleted this entirely.
+    out = paths.redact_sensitive("Decisions: rotate the api_key weekly")
+    assert "Decisions: rotate the" in out
+    assert "api_key" not in out
+    assert "weekly" not in out  # masked keyword->EOL
+    assert "[REDACTED" in out
+
+
+def test_redact_masks_value_span_keeps_trailing_text():
+    token = "ghp_" + "B" * 36
+    out = paths.redact_sensitive(f"deploy via {token} (prod)")
+    assert token not in out
+    assert "(prod)" in out  # high-confidence value masked at span only
+    assert "deploy via" in out
+
+
+def test_redact_catches_prose_form_secret():
+    # "the secret is hunter2" must still lose the value (keyword->EOL).
+    out = paths.redact_sensitive("the secret is hunter2")
+    assert "hunter2" not in out
+    assert "secret" not in out
+    assert "the" in out
+
+
+def test_redact_decision_with_secret_word_keeps_decision_label():
+    out = paths.redact_sensitive("**Decisions**: do not commit secrets to repo")
+    assert "**Decisions**" in out
+    assert "secrets" not in out
+
+
+def test_redact_is_idempotent_under_double_application():
+    # The orchestrator redacts, then the writer redacts again on the same text.
+    # A second pass must be a no-op (placeholder carries no trigger keyword).
+    once = paths.redact_sensitive("config: api_key=hunter2 and ghp_" + "C" * 36)
+    twice = paths.redact_sensitive(once)
+    assert once == twice
+    assert "hunter2" not in twice
+
+
 # --- Ollama endpoint env override --------------------------------------------
 
 

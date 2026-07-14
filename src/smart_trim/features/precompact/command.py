@@ -22,6 +22,7 @@ import json
 import os
 import secrets
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -38,7 +39,12 @@ from smart_trim.features.writer import command as _writer
 from smart_trim.shared import compat as _compat
 from smart_trim.shared import ollama as _ollama
 from smart_trim.shared import paths as _paths
-from smart_trim.shared.config import MAX_CONTEXT_FOR_CLOUD
+from smart_trim.shared.config import (
+    CASCADE_BUDGET_SECONDS,
+    CASCADE_MIN_TIER_SECONDS,
+    MAX_CONTEXT_FOR_CLOUD,
+    OLLAMA_TIMEOUT_SECONDS,
+)
 
 
 def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
@@ -131,39 +137,80 @@ def _cascade(
     preserved = _maybe_update_preserved(preserved, _grounding.extract_negative_constraints(context))
     summary_grounding = _join_grounding(grounding, preserved)
 
-    text, method = _try_local(context, summary_grounding)
+    # One wall-clock budget for the whole LLM cascade. A hung model cannot blow
+    # the PreCompact hook timeout this way — each tier's timeout shrinks with
+    # the remaining budget, and exhaustion fails OPEN to rule-based fallback.
+    deadline = time.monotonic() + CASCADE_BUDGET_SECONDS
+    text, method = _try_local(context, summary_grounding, deadline)
     if text is None:
-        text, method = _try_cloud(messages, grounding, preserved)
+        text, method = _try_cloud(messages, grounding, preserved, deadline)
     if text is None or method is None:
         text = _fallback.generate_fallback_summary(messages, session_id)
         method = "fallback"
     return text, method, preserved
 
 
-def _try_local(context: str, summary_grounding: str) -> tuple[str | None, str | None]:
+def _tier_timeout(deadline: float, share: float = 1.0) -> float | None:
+    """Remaining budget clamped to the per-call ceiling; ``None`` when exhausted.
+
+    ``share`` lets a caller reserve part of the remaining budget for a later
+    tier (primary takes 60% so secondary still gets a turn if primary fails).
+    Below ``CASCADE_MIN_TIER_SECONDS`` we return ``None`` — starting a call
+    that cannot finish just wastes a round-trip.
+    """
+    remaining = deadline - time.monotonic()
+    if remaining < CASCADE_MIN_TIER_SECONDS:
+        return None
+    return min(OLLAMA_TIMEOUT_SECONDS, remaining * share)
+
+
+def _try_local(
+    context: str, summary_grounding: str, deadline: float | None = None
+) -> tuple[str | None, str | None]:
     """Ollama primary then secondary. Returns (text, method) or (None, None).
 
     The ``method`` label is derived from the active model tag (env-aware), so
     overrides via ``SMART_TRIM_PRIMARY_MODEL`` / ``SMART_TRIM_SECONDARY_MODEL``
     keep ``.memory-bank/activeContext.md`` truthful.
     """
+    if deadline is None:
+        deadline = time.monotonic() + CASCADE_BUDGET_SECONDS
     if not _ollama.is_ollama_alive():
         return None, None
-    text = _summarize.summarize_primary(context, grounding=summary_grounding)
-    if text:
-        return text, _summarize.primary_label()
-    text = _summarize.summarize_secondary(context, grounding=summary_grounding)
-    if text:
-        return text, _summarize.secondary_label()
+    # Primary gets 60% of the remaining budget so secondary still has a turn if
+    # primary fails; both per-call caps stay under OLLAMA_TIMEOUT_SECONDS.
+    primary_timeout = _tier_timeout(deadline, share=0.6)
+    if primary_timeout is not None:
+        text = _summarize.summarize_primary(
+            context, grounding=summary_grounding, timeout=primary_timeout
+        )
+        if text:
+            return text, _summarize.primary_label()
+    secondary_timeout = _tier_timeout(deadline, share=1.0)
+    if secondary_timeout is not None:
+        text = _summarize.summarize_secondary(
+            context, grounding=summary_grounding, timeout=secondary_timeout
+        )
+        if text:
+            return text, _summarize.secondary_label()
     return None, None
 
 
-def _try_cloud(messages: list, grounding: str, preserved: str) -> tuple[str | None, str | None]:
+def _try_cloud(
+    messages: list, grounding: str, preserved: str, deadline: float | None = None
+) -> tuple[str | None, str | None]:
     """Cloud cascade tier (re-extracts at the larger cap for DeepSeek 1M ctx)."""
+    if deadline is None:
+        deadline = time.monotonic() + CASCADE_BUDGET_SECONDS
+    cloud_timeout = _tier_timeout(deadline, share=1.0)
+    if cloud_timeout is None:
+        return None, None
     cloud_context = _session.extract_context_for_summary(messages, max_length=MAX_CONTEXT_FOR_CLOUD)
     new_preserved = _grounding.extract_negative_constraints(cloud_context)
     summary_grounding = _join_grounding(grounding, new_preserved or preserved)
-    text = _summarize.summarize_cloud_cascade(cloud_context, grounding=summary_grounding)
+    text = _summarize.summarize_cloud_cascade(
+        cloud_context, grounding=summary_grounding, timeout_total=cloud_timeout
+    )
     if text:
         return text, _summarize.cloud_label()
     return None, None

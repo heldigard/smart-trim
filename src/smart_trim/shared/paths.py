@@ -15,7 +15,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from smart_trim.shared.config import SECRET_RE
+from smart_trim.shared.config import SECRET_KEYWORD_RE, SECRET_VALUE_RE
 
 
 def _has_memory_bank(parent: Path) -> bool:
@@ -65,14 +65,31 @@ def get_project_root(start: str | Path | None = None) -> Path:
 
 
 def redact_sensitive(text: str) -> str:
-    """Redact likely secret-bearing lines before writing agent memory."""
-    clean_lines = []
+    """Redact likely secret-bearing spans before writing agent memory.
+
+    Two-tier masking so a handoff keeps its context instead of losing whole
+    lines (the old behavior nuked any line mentioning ``password``/``secret``
+    as a word, which silently deleted LLM decisions like "rotate the api_key
+    weekly"):
+
+    1. High-confidence secret VALUES (prefixed tokens, PEM headers, JWTs) are
+       masked at the matched span only — the surrounding sentence survives.
+    2. Loose keyword LABELS (``api_key``/``password``/``secret``/...) are masked
+       from the keyword to end-of-line. The regex matches the label, not the
+       value, so masking to EOL is the conservative choice that still catches a
+       prose-form secret ("the secret is hunter2") without leaking it.
+    """
+    cleaned: list[str] = []
     for line in text.splitlines():
-        if SECRET_RE.search(line):
-            clean_lines.append("[REDACTED: possible secret-bearing line]")
-        else:
-            clean_lines.append(line)
-    return "\n".join(clean_lines)
+        line = SECRET_VALUE_RE.sub("[REDACTED]", line)
+        match = SECRET_KEYWORD_RE.search(line)
+        if match:
+            # Placeholder wording avoids every trigger keyword so a second
+            # pass (the writer redacts again after the orchestrator already
+            # did) is a no-op — redaction stays idempotent.
+            line = f"{line[: match.start()]}[REDACTED: possible sensitive value]"
+        cleaned.append(line)
+    return "\n".join(cleaned)
 
 
 def slugify(value: str) -> str:

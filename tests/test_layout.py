@@ -14,7 +14,15 @@ META = 250
 
 # Modules allowed to exceed the 250L meta (cohesive, one responsibility).
 # Each entry: relative path -> human reason. Keep this SHORT and re-review.
-ALLOWLIST: dict[str, str] = {}
+ALLOWLIST: dict[str, str] = {
+    # The PreCompact orchestrator is one end-to-end pipeline (resolve session ->
+    # ground -> LLM cascade -> augment -> archive -> rotate -> persist). The
+    # wall-clock budget threading (deadline -> _tier_timeout -> _try_local /
+    # _try_cloud) is cascade orchestration, not a separable responsibility;
+    # splitting it would fracture the single pipeline the late-binding
+    # monkeypatch contract relies on. Re-review if it grows past ~320L.
+    "features/precompact/command.py": "cohesive end-to-end PreCompact pipeline + cascade budget",
+}
 
 
 def _python_modules() -> list[tuple[str, int]]:

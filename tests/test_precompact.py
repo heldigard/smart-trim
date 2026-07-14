@@ -8,6 +8,7 @@ origin module's function resolves at call time.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from smart_trim.features.precompact import command as precompact
@@ -48,11 +49,13 @@ def test_injects_negative_constraints_into_grounding(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: session_file)
     monkeypatch.setattr(f"{_OLLAMA}.is_ollama_alive", lambda: True)
-    monkeypatch.setattr(f"{_SUMMARIZE}.summarize_secondary", lambda context, grounding="": None)
+    monkeypatch.setattr(
+        f"{_SUMMARIZE}.summarize_secondary", lambda context, grounding="", **_kw: None
+    )
 
     seen: dict[str, str] = {}
 
-    def primary(context, grounding=""):
+    def primary(context, grounding="", **kwargs):
         seen["grounding"] = grounding
         return "**Task**: Fix parser\n**Next**: Run tests"
 
@@ -115,9 +118,11 @@ def test_primary_method_label(tmp_path, monkeypatch):
     monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: session_file)
     monkeypatch.setattr(f"{_OLLAMA}.is_ollama_alive", lambda: True)
     monkeypatch.setattr(
-        f"{_SUMMARIZE}.summarize_primary", lambda context, grounding="": "primary summary"
+        f"{_SUMMARIZE}.summarize_primary", lambda context, grounding="", **_kw: "primary summary"
     )
-    monkeypatch.setattr(f"{_SUMMARIZE}.summarize_secondary", lambda context, grounding="": None)
+    monkeypatch.setattr(
+        f"{_SUMMARIZE}.summarize_secondary", lambda context, grounding="", **_kw: None
+    )
 
     seen: dict[str, str] = {}
 
@@ -180,7 +185,8 @@ def test_cloud_tier_used_when_ollama_down(tmp_path, monkeypatch):
     monkeypatch.setattr(f"{_COMPAT}.cg_reset", None)
     monkeypatch.setattr(f"{_OLLAMA}.is_ollama_alive", lambda: False)
     monkeypatch.setattr(
-        f"{_SUMMARIZE}.summarize_cloud_cascade", lambda context, grounding="": "cloud handoff" * 10
+        f"{_SUMMARIZE}.summarize_cloud_cascade",
+        lambda context, grounding="", **_kw: "cloud handoff" * 10,
     )
     monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: session_file)
     monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
@@ -309,10 +315,12 @@ def test_precompact_minimal_handoff_empty_messages(tmp_path, monkeypatch):
 def test_precompact_secondary_ollama_success(tmp_path, monkeypatch):
     monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
     monkeypatch.setattr(
-        precompact._summarize, "summarize_primary", lambda context, grounding="": None
+        precompact._summarize, "summarize_primary", lambda context, grounding="", **_kw: None
     )
     monkeypatch.setattr(
-        precompact._summarize, "summarize_secondary", lambda context, grounding="": "secondary ok"
+        precompact._summarize,
+        "summarize_secondary",
+        lambda context, grounding="", **_kw: "secondary ok",
     )
 
     text, method = precompact._try_local("context", "grounding")
@@ -511,10 +519,10 @@ def test_precompact_capabilities_table_output(monkeypatch, capsys):
 def test_precompact_try_local_returns_none_none(monkeypatch):
     monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
     monkeypatch.setattr(
-        precompact._summarize, "summarize_primary", lambda context, grounding="": None
+        precompact._summarize, "summarize_primary", lambda context, grounding="", **_kw: None
     )
     monkeypatch.setattr(
-        precompact._summarize, "summarize_secondary", lambda context, grounding="": None
+        precompact._summarize, "summarize_secondary", lambda context, grounding="", **_kw: None
     )
 
     text, method = precompact._try_local("context", "grounding")
@@ -608,3 +616,75 @@ def test_message_reports_write_failure(tmp_path, monkeypatch):
 def test_message_reports_active_route(tmp_path, monkeypatch):
     result = _routed_precompact(tmp_path, monkeypatch, "active")
     assert "activeContext.md" in result["systemMessage"]
+
+
+# --- cascade wall-clock budget -----------------------------------------------
+
+
+def test_tier_timeout_none_when_below_floor():
+    # Under CASCADE_MIN_TIER_SECONDS the tier is skipped (None) rather than
+    # starting a call that cannot finish.
+    assert precompact._tier_timeout(time.monotonic() + 1.0) is None
+
+
+def test_tier_timeout_clamps_to_remaining_share_and_ceiling():
+    from smart_trim.shared.config import OLLAMA_TIMEOUT_SECONDS
+
+    out = precompact._tier_timeout(time.monotonic() + 20.0, share=0.6)
+    assert out is not None
+    assert out <= 20.0 * 0.6 + 0.01  # 60% share of the remaining budget
+    assert out <= OLLAMA_TIMEOUT_SECONDS
+
+
+def test_tier_timeout_never_exceeds_per_call_ceiling():
+    from smart_trim.shared.config import OLLAMA_TIMEOUT_SECONDS
+
+    # A huge remaining budget still clamps to the per-call ceiling.
+    out = precompact._tier_timeout(time.monotonic() + 10_000.0)
+    assert out == OLLAMA_TIMEOUT_SECONDS
+
+
+def test_try_local_skips_both_tiers_when_budget_exhausted(monkeypatch):
+    monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
+    calls = {"primary": 0, "secondary": 0}
+    monkeypatch.setattr(
+        precompact._summarize,
+        "summarize_primary",
+        lambda *a, **k: calls.__setitem__("primary", calls["primary"] + 1) or None,
+    )
+    monkeypatch.setattr(
+        precompact._summarize,
+        "summarize_secondary",
+        lambda *a, **k: calls.__setitem__("secondary", calls["secondary"] + 1) or None,
+    )
+    text, method = precompact._try_local("ctx", "g", deadline=time.monotonic() - 1.0)
+    assert (text, method) == (None, None)
+    assert calls == {"primary": 0, "secondary": 0}
+
+
+def test_try_cloud_skips_when_budget_exhausted(monkeypatch):
+    calls = {"cloud": 0}
+    monkeypatch.setattr(
+        precompact._summarize,
+        "summarize_cloud_cascade",
+        lambda *a, **k: calls.__setitem__("cloud", calls["cloud"] + 1) or None,
+    )
+    text, method = precompact._try_cloud([], "g", "", deadline=time.monotonic() - 1.0)
+    assert (text, method) == (None, None)
+    assert calls == {"cloud": 0}
+
+
+def test_try_local_passes_shrinking_timeout_to_primary(monkeypatch):
+    monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
+    captured: dict[str, float] = {}
+
+    def fake_primary(context, grounding="", timeout=999.0, **_kw):
+        captured["timeout"] = timeout
+        return "primary ok"
+
+    monkeypatch.setattr(precompact._summarize, "summarize_primary", fake_primary)
+    # 30s remaining -> primary gets 60% (~18s), under the 45s ceiling.
+    text, method = precompact._try_local("ctx", "g", deadline=time.monotonic() + 30.0)
+    assert text == "primary ok"
+    assert captured["timeout"] <= 30.0 * 0.6 + 0.01
+    assert captured["timeout"] > 0.0
