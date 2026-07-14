@@ -57,3 +57,25 @@ Hook shim: `~/.claude/hooks/smart-trim.py` (21L) → `smart_trim.features.precom
 - Live smoke: foreign route and active route both verified end-to-end with real
   Ollama primary (ollama-gemma4-e2b) via the Claude shim.
 - Codex shim now symlinks the Claude shim (single source of truth).
+
+## 2026-07-14 — redaction precision + cascade wall-clock budget
+
+- `redact_sensitive` now two-tier: high-confidence VALUES (prefixed tokens,
+  PEM, JWT) masked at span; loose KEYWORDS (api_key/password/secret/...)
+  masked keyword→EOL. Old whole-line nuke lost LLM decisions that merely named
+  a field ("rotate the api_key weekly"). Placeholder wording avoids every
+  trigger keyword so the double-application (orchestrator + writer) stays
+  idempotent. config.py: SECRET_RE → SECRET_VALUE_RE + SECRET_KEYWORD_RE.
+- LLM cascade now bounded by one wall-clock budget (`SMART_TRIM_CASCADE_BUDGET_SECONDS`,
+  default 40s; `CASCADE_MIN_TIER_SECONDS`=3 floor). `_tier_timeout` clamps each
+  tier to the remaining share (primary 60%, secondary/cloud 100%) under
+  OLLAMA_TIMEOUT_SECONDS. A hung model can no longer blow the PreCompact hook
+  timeout and lose the ENTIRE handoff (cascade ran before any write); it fails
+  OPEN to rule-based fallback. summarize_primary/secondary/cloud_cascade grew
+  `timeout=` / `timeout_total=` params.
+- precompact/command.py 284L → ALLOWLIST (cohesive end-to-end pipeline + budget
+  orchestration; splitting would fracture the late-binding monkeypatch contract).
+- 226 pytest green (+11: 5 redaction precision/idempotency, 6 budget),
+  ruff lint+format clean. Two isolated e2e smokes via the live shim with real
+  Ollama primary: active route wrote activeContext (Decisions line showed
+  "Rotate " preserved + value masked), foreign route correct.

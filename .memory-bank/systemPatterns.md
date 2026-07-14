@@ -95,3 +95,43 @@ both hook return dicts).
 **Harness**: `~/.codex/hooks/smart-trim.py` was an unmanaged identical COPY of
 the Claude shim (drift risk, no sync script covers it) — converted to symlink
 like Gemini; backup at smart-trim.py.bak.
+
+## 2026-07-14 — Redaction precision + cascade wall-clock budget
+
+**Decision 1 (redaction)**: split `SECRET_RE` into `SECRET_VALUE_RE`
+(high-confidence values: prefixed tokens, PEM, JWT — masked at the matched
+SPAN) and `SECRET_KEYWORD_RE` (loose labels api_key/password/secret/... —
+masked keyword→END-OF-LINE). `redact_sensitive` masks spans instead of whole
+lines.
+
+**Why**: the old whole-line redaction deleted any LLM handoff line that merely
+mentioned "secret"/"password"/"api_key" as a word — real decisions like "rotate
+the api_key weekly" vanished. Span/value masking keeps the decision context
+("Rotate ") while never leaking a value. Keyword→EOL is the conservative choice
+that still catches prose-form secrets ("the secret is hunter2").
+
+**Invariant**: redaction MUST stay idempotent under double-application
+(handle_precompact redacts, then writer redacts again on the same text). The
+keyword-tier placeholder wording is chosen to contain NO trigger keyword — a
+second pass is a no-op. Enforced by `test_redact_is_idempotent_under_double_application`.
+
+**Decision 2 (budget)**: the LLM cascade is bounded by ONE wall-clock budget
+(`SMART_TRIM_CASCADE_BUDGET_SECONDS`, default 40; floor `CASCADE_MIN_TIER_SECONDS`=3).
+`_tier_timeout(deadline, share)` clamps each tier's per-call timeout to the
+remaining budget (primary share=0.6 so secondary still gets a turn; secondary
+and cloud share=1.0), under `OLLAMA_TIMEOUT_SECONDS`.
+
+**Why**: the cascade runs BEFORE any write, so a hung model exceeding the
+PreCompact hook timeout lost the ENTIRE handoff. Worst case was primary(45s)+
+secondary(45s)+cloud(45s)=135s. The budget fails OPEN to rule-based fallback
+instead. Healthy gens (primary ~6s) finish well under their 60%-share cap, so
+the common path is unaffected; only true hangs hit the cap.
+
+**Rejected**: parallelizing primary+secondary — GPU serializes local gens, so
+it wastes GPU on the success path and doesn't fix a single hung model. The
+budget is the correct bound.
+
+**Rejected**: splitting the cascade tiers out of `precompact/command.py` (now
+284L) into `precompact/cascade.py` — the budget logic is cascade orchestration,
+not a separable responsibility, and splitting would fracture the late-binding
+monkeypatch contract. Used the layout ALLOWLIST instead (review if > ~320L).
