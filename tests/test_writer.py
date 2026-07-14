@@ -311,6 +311,7 @@ def test_render_active_fields_character_budget_exceeded():
 
 def test_atomic_write_text_unlink_oserror(tmp_path, monkeypatch):
     import tempfile
+
     original_mkstemp = tempfile.mkstemp
 
     def fake_mkstemp(*args, **kwargs):
@@ -345,7 +346,6 @@ def test_render_active_fields_detail_pointer_pops_non_critical():
     assert not any(r.startswith("- **Decisions**:") for r in res)
 
 
-
 def test_is_home_meta_bank_oserror(monkeypatch):
     def fake_resolve(self):
         raise OSError("Simulated resolve error")
@@ -376,6 +376,7 @@ def test_known_project_names_oserror(monkeypatch, tmp_path):
 
     # Iterdir raises OSError (covers line 175 continue)
     monkeypatch.setattr(writer, "_PROJECT_PARENTS", (str(tmp_path),))
+
     def fake_iterdir(self):
         raise OSError("Simulated iterdir error")
 
@@ -391,4 +392,30 @@ def test_known_project_names_valid(monkeypatch, tmp_path):
     assert writer._known_project_names() == {"my_project"}
 
 
+# --- update_agent_memory route return ----------------------------------------
 
+
+def test_update_agent_memory_returns_active_route(tmp_path):
+    project = tmp_path / "p"
+    (project / ".memory-bank").mkdir(parents=True)
+    route = writer.update_agent_memory(
+        "**Task**: local work", "fallback", "s", project_root=project
+    )
+    assert route == "active"
+    assert (project / ".memory-bank" / "activeContext.md").exists()
+
+
+def test_update_agent_memory_returns_foreign_route(tmp_path):
+    project = tmp_path / "p"
+    (project / ".memory-bank").mkdir(parents=True)
+    summary = "**Files**: /mnt/other/project/app.py"
+    route = writer.update_agent_memory(summary, "fallback", "s", project_root=project)
+    assert route == "foreign"
+    assert not (project / ".memory-bank" / "activeContext.md").exists()
+
+
+def test_update_agent_memory_returns_error_route():
+    route = writer.update_agent_memory(
+        "x", "fallback", "s", project_root=Path("/nonexistent/readonly/x")
+    )
+    assert route == "error"

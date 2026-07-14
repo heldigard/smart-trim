@@ -73,3 +73,25 @@ could cancel otherwise recoverable work.
 **Invariant**: Bounds described by configuration are exact (including joining
 separators), and deterministic fallback output preserves first occurrence order.
 - 2026-07-13T13:51:04Z | status:live | Meta-bank isolation (2026-07-13): the HOME meta bank (~/.claude/memory-bank via /home/eldi/.memory-bank symlink) is a catch-all for sessions launched from ~. smart-trim _is_foreign_session now treats a HOME-rooted session as FOREIGN unless its summary carries a harness/meta signal (.claude, hooks/, skills/, graduated package names, memory-bank) — so project work run from home (by name, no absolute path) routes to the foreign-sessions topic, not activeContext. Rule: launch project sessions FROM the project dir (cd project && cli) so they resolve their own .memory-bank; home is meta-only. elogix has its own bank at /mnt/ext4disk/ProyectosP/Elogix/.memory-bank. Fix lives in ~/smart-trim (shared by Claude+Codex).
+
+## 2026-07-14 — Route-aware hook message + env knobs
+
+**Decision**: `writer.update_agent_memory` returns its persistence route
+(`active`/`foreign`/`error`); `policy.final_message` renders it so the
+PreCompact systemMessage never claims an activeContext update that was routed
+to `topics/foreign-sessions.md` or silently failed. `_final_message` moved
+from precompact/command.py to policy.py (250L gate + cohesion: policy owns
+both hook return dicts).
+
+**Env knobs added** (all default-preserving):
+- `SMART_TRIM_OLLAMA_BASE` (or standard `OLLAMA_HOST`, bare host:port OK) —
+  Ollama endpoint; invalid values fall back to localhost:11434.
+- `SMART_TRIM_CLOUD_MODEL` — cloud tier model; label stays `deepseek-cloud`
+  for the default, else derives `cloud-<bare-model>` (env-aware like local tiers).
+
+**Security**: SECRET_RE extended with high-confidence token prefixes
+(gh[pousr]_/github_pat_/glpat-/AKIA/xox[abprs]-/npm_/AIza/JWT eyJ..eyJ).
+
+**Harness**: `~/.codex/hooks/smart-trim.py` was an unmanaged identical COPY of
+the Claude shim (drift risk, no sync script covers it) — converted to symlink
+like Gemini; backup at smart-trim.py.bak.

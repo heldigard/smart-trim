@@ -289,3 +289,92 @@ def test_config_env_overrides(monkeypatch):
     monkeypatch.delenv("SMART_TRIM_MAX_CONTEXT_LOCAL", raising=False)
     monkeypatch.delenv("SMART_TRIM_MAX_CONTEXT_CLOUD", raising=False)
     importlib.reload(config)
+
+
+# --- redaction: high-confidence token prefixes -------------------------------
+
+
+def test_redact_sensitive_redacts_github_token():
+    token = "ghp_" + "A" * 36
+    out = paths.redact_sensitive(f"push with {token}")
+    assert "[REDACTED" in out and token not in out
+
+
+def test_redact_sensitive_redacts_aws_key_id():
+    key = "AKIA" + "IOSFODNN7EXAMPLE"
+    out = paths.redact_sensitive(f"aws {key}")
+    assert "[REDACTED" in out and key not in out
+
+
+def test_redact_sensitive_redacts_slack_token():
+    token = "xoxb-" + "123456789012-abcdef"
+    out = paths.redact_sensitive(f"slack {token}")
+    assert "[REDACTED" in out and token not in out
+
+
+def test_redact_sensitive_redacts_gitlab_pat():
+    token = "glpat-" + "x" * 20
+    out = paths.redact_sensitive(f"gitlab {token}")
+    assert "[REDACTED" in out and token not in out
+
+
+def test_redact_sensitive_redacts_jwt():
+    jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig"
+    out = paths.redact_sensitive(f"auth header {jwt}")
+    assert "[REDACTED" in out and jwt not in out
+
+
+def test_redact_sensitive_keeps_plain_gh_words():
+    assert paths.redact_sensitive("ghpages deploy ok") == "ghpages deploy ok"
+
+
+# --- Ollama endpoint env override --------------------------------------------
+
+
+def test_ollama_base_env_override_full_url(monkeypatch):
+    import importlib
+
+    from smart_trim.shared import config
+
+    monkeypatch.setenv("SMART_TRIM_OLLAMA_BASE", "http://10.0.0.5:11500")
+    importlib.reload(config)
+    try:
+        assert config.OLLAMA_BASE == "http://10.0.0.5:11500"
+        assert config.OLLAMA_HOST == "10.0.0.5"
+        assert config.OLLAMA_PORT == 11500
+    finally:
+        monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
+        importlib.reload(config)
+
+
+def test_ollama_base_env_override_bare_hostport(monkeypatch):
+    import importlib
+
+    from smart_trim.shared import config
+
+    monkeypatch.setenv("OLLAMA_HOST", "remote-box:11434")
+    monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
+    importlib.reload(config)
+    try:
+        assert config.OLLAMA_BASE == "http://remote-box:11434"
+        assert config.OLLAMA_HOST == "remote-box"
+        assert config.OLLAMA_PORT == 11434
+    finally:
+        monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        importlib.reload(config)
+
+
+def test_ollama_base_invalid_env_falls_back(monkeypatch):
+    import importlib
+
+    from smart_trim.shared import config
+
+    monkeypatch.setenv("SMART_TRIM_OLLAMA_BASE", "http://bad:port:99")
+    importlib.reload(config)
+    try:
+        assert config.OLLAMA_BASE == "http://localhost:11434"
+        assert config.OLLAMA_HOST == "localhost"
+        assert config.OLLAMA_PORT == 11434
+    finally:
+        monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
+        importlib.reload(config)

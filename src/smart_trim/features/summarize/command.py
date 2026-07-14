@@ -35,6 +35,8 @@ _SECONDARY_MODEL = os.environ.get(
     "SMART_TRIM_SECONDARY_MODEL",
     "cryptidbleh/gemma4-claude-opus-4.6:latest",
 )
+_DEFAULT_CLOUD_MODEL = "deepseek/deepseek-v4-flash"
+_CLOUD_MODEL = os.environ.get("SMART_TRIM_CLOUD_MODEL", _DEFAULT_CLOUD_MODEL)
 
 
 def get_summary_prompt(context: str, grounding: str = "") -> str:
@@ -119,6 +121,18 @@ def secondary_label() -> str:
     return f"ollama-{_normalize_model_for_label(_SECONDARY_MODEL)}"
 
 
+def cloud_label() -> str:
+    """Stable, env-aware label for the CLOUD tier (drives the `method` field).
+
+    Keeps the historical ``deepseek-cloud`` label for the default model so
+    persisted handoffs stay comparable; an ``SMART_TRIM_CLOUD_MODEL`` override
+    derives ``cloud-<bare-model>`` so the label stays truthful.
+    """
+    if _CLOUD_MODEL == _DEFAULT_CLOUD_MODEL:
+        return "deepseek-cloud"
+    return f"cloud-{_normalize_model_for_label(_CLOUD_MODEL.split('/')[-1])}"
+
+
 # Quantization / VRAM-hint suffixes that vary per-host and must NOT appear in
 # the persisted method label (they identify the *host*, not the *model*).
 _QUANT_SUFFIXES = (
@@ -173,7 +187,7 @@ def summarize_cloud_cascade(context: str, grounding: str = "") -> str | None:
             timeout_total=45.0,  # DeepSeek 1M ctx on a large context needs headroom
             prefer_local=False,  # local primary+secondary already tried upstream
             require_json=False,  # summary is free text, not JSON
-            cloud_model="deepseek/deepseek-v4-flash",  # judgment tier
+            cloud_model=_CLOUD_MODEL,  # judgment tier (env-overridable)
         )
         text = result.get("text", "").strip()
         if text and len(text) > 50:
@@ -191,4 +205,5 @@ __all__ = [
     "summarize_cloud_cascade",
     "primary_label",
     "secondary_label",
+    "cloud_label",
 ]

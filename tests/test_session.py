@@ -434,4 +434,3 @@ def test_read_session_read_oserror(monkeypatch, tmp_path):
 
     monkeypatch.setattr("builtins.open", fake_open)
     assert session.read_session(f) == []
-

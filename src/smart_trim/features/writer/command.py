@@ -27,8 +27,14 @@ def update_agent_memory(
     method: str,
     session_id: str = "unknown",
     project_root: Path | None = None,
-) -> None:
-    """Write compact and deep handoffs to the shared agent memory bank."""
+) -> str:
+    """Write compact and deep handoffs to the shared agent memory bank.
+
+    Returns the persistence route so the hook message stays truthful:
+    ``"active"`` (activeContext updated), ``"foreign"`` (routed to
+    ``topics/foreign-sessions.md``), or ``"error"`` (best-effort write failed;
+    compaction proceeds regardless).
+    """
     try:
         project_root = project_root or get_project_root()
         memory_dir = project_root / ".memory-bank"
@@ -37,15 +43,16 @@ def update_agent_memory(
         handoff_body = f"Method: {method}\nSession: {session_id}\n\n{safe_summary}"
         if _is_foreign_session(safe_summary, project_root):
             _append_topic(memory_dir, "foreign-sessions", handoff_body)
-            return
+            return "foreign"
         # Create the recovery target before publishing an active-context
         # pointer to it. If either write fails, the previous active handoff is
         # left intact by the outer best-effort boundary.
         _append_topic(memory_dir, "session-handoffs", handoff_body)
         _write_active(memory_dir, safe_summary, method)
+        return "active"
     except Exception:
         # Memory update is best-effort; never block compaction.
-        pass
+        return "error"
 
 
 def _write_active(memory_dir: Path, safe_summary: str, method: str) -> None:

@@ -66,9 +66,12 @@ def handle_precompact(input_data: dict[str, Any]) -> dict[str, Any]:
     _archive_summary(summary_text, method, trigger, session_id)
     # Rotate AFTER writing so the "keep newest N" invariant holds.
     _hygiene.cleanup_old_summaries()
-    _writer.update_agent_memory(summary_text, method, session_id, project_root=project_root)
+    route = (
+        _writer.update_agent_memory(summary_text, method, session_id, project_root=project_root)
+        or "active"
+    )
 
-    return _final_message(method, trigger, _hygiene.check_memory_hygiene())
+    return _policy.final_message(method, trigger, _hygiene.check_memory_hygiene(), route)
 
 
 def _safe_reset_cg() -> None:
@@ -162,7 +165,7 @@ def _try_cloud(messages: list, grounding: str, preserved: str) -> tuple[str | No
     summary_grounding = _join_grounding(grounding, new_preserved or preserved)
     text = _summarize.summarize_cloud_cascade(cloud_context, grounding=summary_grounding)
     if text:
-        return text, "deepseek-cloud"
+        return text, _summarize.cloud_label()
     return None, None
 
 
@@ -195,17 +198,6 @@ def _archive_summary(summary_text: str, method: str, trigger: str, session_id: s
     except Exception:
         # Summary archive is best-effort; never block compaction.
         pass
-
-
-def _final_message(method: str, trigger: str, memory_warning: str | None) -> dict[str, Any]:
-    """Build the PreCompact return dict (manual /compact stays silent)."""
-    is_manual = trigger == "manual"
-    saved = f"[smart-trim] {method} summary saved to .memory-bank/activeContext.md"
-    if memory_warning and not is_manual:
-        return {"continue": True, "systemMessage": f"{saved}. {memory_warning}"}
-    if is_manual:
-        return {"continue": True}
-    return {"continue": True, "systemMessage": f"{saved} (will reload on next SessionStart)."}
 
 
 def _maybe_update_preserved(current: str, new: str) -> str:

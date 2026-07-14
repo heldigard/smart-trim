@@ -50,3 +50,10 @@ Hook shim: `~/.claude/hooks/smart-trim.py` (21L) → `smart_trim.features.precom
 - 2026-07-13T00:26:54Z | 2026-07-12: Ajustes finales de features de capacidades/precompact/sessión + cobertura y limpieza de ruido menor antes de commit/push del paquete.
 - 2026-07-13T13:51:04Z | status:completed | 2026-07-13 meta-bank contamination fixed: smart-trim _is_foreign_session gained HOME-meta guard + ~/$HOME path expansion + known-project-name detection. Root cause = elogix Codex session ran from home, handoff named project without abs paths, overwrote meta activeContext. 4 regression tests, full suite green, pushed smart-trim d489c0e. agent-memory project_root() still has the same HOME-catch-all (lower priority — smart-trim was the active writer); optional follow-up.
 - 2026-07-14T00:04:50Z | status:completed | session:f6e15eb3-92cf-43da-96b2-26f50e91c18b | gemini: session done
+
+## 2026-07-14 — audit round: truthful routes + env-aware endpoints
+
+- 215 pytest green (+17 new), ruff lint+format clean.
+- Live smoke: foreign route and active route both verified end-to-end with real
+  Ollama primary (ollama-gemma4-e2b) via the Claude shim.
+- Codex shim now symlinks the Claude shim (single source of truth).

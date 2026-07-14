@@ -508,7 +508,6 @@ def test_precompact_capabilities_table_output(monkeypatch, capsys):
     assert "capabilities" in output
 
 
-
 def test_precompact_try_local_returns_none_none(monkeypatch):
     monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
     monkeypatch.setattr(
@@ -573,3 +572,39 @@ def test_precompact_manual_trigger_with_transcript(tmp_path, monkeypatch):
     )
     assert result == {"continue": True}
 
+
+# --- route-aware systemMessage (writer route reflected truthfully) -----------
+
+
+def _routed_precompact(tmp_path, monkeypatch, route):
+    project = tmp_path / "project"
+    (project / ".memory-bank").mkdir(parents=True)
+    session_file = _seed_session(tmp_path, "edit /tmp/x.py")
+    _disable_external(monkeypatch)
+    monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: session_file)
+    monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.cleanup_old_summaries", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.check_memory_hygiene", lambda *a, **k: None
+    )
+    monkeypatch.setattr(f"{_WRITER}.update_agent_memory", lambda *a, **k: route)
+    return precompact.handle_precompact({"trigger": "auto", "sessionId": "s", "cwd": str(project)})
+
+
+def test_message_reports_foreign_route(tmp_path, monkeypatch):
+    result = _routed_precompact(tmp_path, monkeypatch, "foreign")
+    assert "foreign-sessions" in result["systemMessage"]
+    assert "activeContext" not in result["systemMessage"]
+
+
+def test_message_reports_write_failure(tmp_path, monkeypatch):
+    result = _routed_precompact(tmp_path, monkeypatch, "error")
+    assert "failed" in result["systemMessage"]
+    assert "activeContext" not in result["systemMessage"]
+
+
+def test_message_reports_active_route(tmp_path, monkeypatch):
+    result = _routed_precompact(tmp_path, monkeypatch, "active")
+    assert "activeContext.md" in result["systemMessage"]

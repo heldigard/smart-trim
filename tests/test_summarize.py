@@ -223,3 +223,33 @@ def test_labels_fall_back_when_no_quant_suffix(monkeypatch):
     finally:
         monkeypatch.delenv("SMART_TRIM_SECONDARY_MODEL", raising=False)
         importlib.reload(sum_cmd)
+
+
+# --- cloud tier: env-aware model + label -------------------------------------
+
+
+def test_cloud_label_default_is_deepseek_cloud():
+    assert summarize.cloud_label() == "deepseek-cloud"
+
+
+def test_cloud_model_env_override_changes_model_and_label(monkeypatch):
+    import importlib
+
+    from smart_trim.features.summarize import command as sum_cmd
+
+    monkeypatch.setenv("SMART_TRIM_CLOUD_MODEL", "deepseek/deepseek-v4-pro")
+    importlib.reload(sum_cmd)
+    try:
+        captured = {}
+
+        def fake_complete(**kwargs):
+            captured.update(kwargs)
+            return {"text": "x" * 60}
+
+        monkeypatch.setattr(compat, "cheap_complete", fake_complete)
+        sum_cmd.summarize_cloud_cascade("ctx")
+        assert captured["cloud_model"] == "deepseek/deepseek-v4-pro"
+        assert sum_cmd.cloud_label() == "cloud-deepseek-v4-pro"
+    finally:
+        monkeypatch.delenv("SMART_TRIM_CLOUD_MODEL", raising=False)
+        importlib.reload(sum_cmd)
