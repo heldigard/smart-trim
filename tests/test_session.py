@@ -380,3 +380,58 @@ def test_content_extraction_edge_cases():
     tool_res_dict = [{"type": "tool_result", "content": {"status": "ok"}}]
     out = content._extract_text_from_content(tool_res_dict, "assistant")
     assert '{"status": "ok"}' in out
+
+
+def test_collect_project_jsonls_oserror(monkeypatch, tmp_path):
+    projects_dir = tmp_path / "projects"
+    projects_dir.mkdir()
+    p1 = projects_dir / "proj1"
+    p1.mkdir()
+
+    original_glob = Path.glob
+
+    def fake_glob(self, pattern):
+        if self == p1:
+            raise OSError("permission denied")
+        return original_glob(self, pattern)
+
+    monkeypatch.setattr(Path, "glob", fake_glob)
+    monkeypatch.setattr(session, "_project_dirs", lambda root: [p1])
+    assert session._collect_project_jsonls(projects_dir) == []
+
+
+def test_candidate_from_cwd_invalid_session_id():
+    assert session._candidate_from_cwd("invalid/session/id", "/some/cwd") is None
+
+
+def test_candidate_from_cwd_resolve_oserror(monkeypatch):
+    def fake_resolve(self):
+        raise OSError("resolve failure")
+
+    monkeypatch.setattr(Path, "resolve", fake_resolve)
+    assert session._candidate_from_cwd("valid_session", "/some/cwd") is None
+
+
+def test_search_session_id_all_projects_invalid():
+    assert session._search_session_id_all_projects("invalid/session/id") is None
+
+
+def test_session_tail_bytes_value_error(monkeypatch):
+    monkeypatch.setenv("SMART_TRIM_SESSION_TAIL_BYTES", "not-a-number")
+    assert session._session_tail_bytes() == 4 * 1024 * 1024
+
+
+def test_read_session_read_oserror(monkeypatch, tmp_path):
+    f = tmp_path / "read_error.jsonl"
+    f.write_text("{}", encoding="utf-8")
+
+    original_open = open
+
+    def fake_open(file, *args, **kwargs):
+        if str(file) == str(f):
+            raise OSError("permission denied")
+        return original_open(file, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", fake_open)
+    assert session.read_session(f) == []
+

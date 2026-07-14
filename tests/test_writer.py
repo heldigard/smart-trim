@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+import pytest
+
 from smart_trim.features.writer import active as active_renderer
 from smart_trim.features.writer import command as writer
 
@@ -278,3 +280,115 @@ def test_is_foreign_session_resolve_oserror(monkeypatch):
     fake_root = cast(Path, FakePath("/dummy"))
     assert writer._is_foreign_session("edit /elsewhere/x.py", fake_root) is True
     assert writer._is_foreign_session("edit /dummy/x.py", fake_root) is False
+
+
+def test_parse_summary_fields_generic_header():
+    summary = "## Some Other Header\n**Task**: fix it"
+    fields, notes = active_renderer.parse_summary_fields(summary)
+    assert fields["Task"] == ["fix it"]
+
+
+def test_render_active_fields_critical_does_not_fit():
+    header = ["# Active Context"] * 28
+    summary = "**Task**: this task will not fit in the lines budget"
+    with pytest.raises(ValueError, match="critical active-context field did not fit"):
+        active_renderer.render_active_fields(summary, header)
+
+
+def test_render_active_fields_detail_pointer_does_not_fit():
+    header = ["# Active Context"] * 27
+    summary = "**Task**: fit\n**Decisions**: choice"
+    with pytest.raises(ValueError, match="active-context detail pointer did not fit"):
+        active_renderer.render_active_fields(summary, header)
+
+
+def test_render_active_fields_character_budget_exceeded():
+    header = ["x" * 1250]
+    summary = ""
+    with pytest.raises(ValueError, match="character budget"):
+        active_renderer.render_active_fields(summary, header)
+
+
+def test_atomic_write_text_unlink_oserror(tmp_path, monkeypatch):
+    import tempfile
+    original_mkstemp = tempfile.mkstemp
+
+    def fake_mkstemp(*args, **kwargs):
+        fd, name = original_mkstemp(*args, **kwargs)
+        original_unlink = Path.unlink
+
+        def fake_unlink(self, *a, **k):
+            if self.name == Path(name).name:
+                raise OSError("Simulated unlink failure")
+            return original_unlink(self, *a, **k)
+
+        monkeypatch.setattr(Path, "unlink", fake_unlink)
+        return fd, name
+
+    monkeypatch.setattr(tempfile, "mkstemp", fake_mkstemp)
+
+    def fake_replace(*args, **kwargs):
+        raise OSError("Simulated replace failure")
+
+    monkeypatch.setattr(active_renderer.os, "replace", fake_replace)
+
+    with pytest.raises(OSError, match="Simulated replace failure"):
+        active_renderer.atomic_write_text(tmp_path / "target", "content")
+
+
+def test_render_active_fields_detail_pointer_pops_non_critical():
+    header = ["# Active Context"] * 26
+    summary = "**Task**: fit\n**Decisions**: choice1\n**Objective**: choice2"
+    res = active_renderer.render_active_fields(summary, header)
+    assert any("Task" in r for r in res)
+    assert any("Detail" in r for r in res)
+    assert not any(r.startswith("- **Decisions**:") for r in res)
+
+
+
+def test_is_home_meta_bank_oserror(monkeypatch):
+    def fake_resolve(self):
+        raise OSError("Simulated resolve error")
+
+    monkeypatch.setattr(Path, "resolve", fake_resolve)
+    assert writer._is_home_meta_bank(Path("/dummy")) is False
+
+
+def test_child_bank_name_oserror(monkeypatch, tmp_path):
+    def fake_is_dir(self):
+        raise OSError("Simulated is_dir error")
+
+    monkeypatch.setattr(Path, "is_dir", fake_is_dir)
+    assert writer._child_bank_name(tmp_path) is None
+
+
+def test_child_bank_name_not_dir(tmp_path):
+    file_path = tmp_path / "some_file.txt"
+    file_path.write_text("hello")
+    assert writer._child_bank_name(file_path) is None
+
+
+def test_known_project_names_oserror(monkeypatch, tmp_path):
+    # Non-existent parent directory (covers line 171 continue)
+    non_existent = tmp_path / "nonexistent_parent"
+    monkeypatch.setattr(writer, "_PROJECT_PARENTS", (str(non_existent),))
+    assert writer._known_project_names() == set()
+
+    # Iterdir raises OSError (covers line 175 continue)
+    monkeypatch.setattr(writer, "_PROJECT_PARENTS", (str(tmp_path),))
+    def fake_iterdir(self):
+        raise OSError("Simulated iterdir error")
+
+    monkeypatch.setattr(Path, "iterdir", fake_iterdir)
+    assert writer._known_project_names() == set()
+
+
+def test_known_project_names_valid(monkeypatch, tmp_path):
+    project_dir = tmp_path / "my_project"
+    project_dir.mkdir()
+    (project_dir / ".memory-bank").mkdir()
+    monkeypatch.setattr(writer, "_PROJECT_PARENTS", (str(tmp_path),))
+    assert writer._known_project_names() == {"my_project"}
+
+
+

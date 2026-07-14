@@ -494,6 +494,21 @@ def test_precompact_capabilities_json_has_side_effect_contract(monkeypatch, caps
     assert payload["degradation"].endswith("deterministic summary")
 
 
+def test_precompact_capabilities_table_output(monkeypatch, capsys):
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["smart-trim", "capabilities"])
+    monkeypatch.setattr(sys, "stdin", None)
+
+    precompact.main()
+
+    output = capsys.readouterr().out
+    assert "name          ro  open  cost          writes" in output
+    assert "precompact" in output
+    assert "capabilities" in output
+
+
+
 def test_precompact_try_local_returns_none_none(monkeypatch):
     monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
     monkeypatch.setattr(
@@ -536,3 +551,25 @@ def test_main_fails_open_when_handler_raises(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert _json.loads(captured.out) == {"continue": True}
     assert "boom" in captured.err
+
+
+def test_precompact_manual_trigger_with_transcript(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    (project / ".memory-bank").mkdir(parents=True)
+    session_file = _seed_session(tmp_path, "some request")
+    _disable_external(monkeypatch)
+    monkeypatch.setattr(f"{_SESSION}.get_session_file", lambda input_data: session_file)
+    monkeypatch.setattr(precompact, "_archive_summary", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.cleanup_old_summaries", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "smart_trim.features.hygiene.command.check_memory_hygiene", lambda *a, **k: None
+    )
+    monkeypatch.setattr(f"{_WRITER}.update_agent_memory", lambda *a, **k: None)
+
+    result = precompact.handle_precompact(
+        {"trigger": "manual", "sessionId": "sess-manual", "cwd": str(project)}
+    )
+    assert result == {"continue": True}
+
