@@ -181,3 +181,74 @@ markers glued mid-line + head/tail semantic overlap. Two review passes:
 - Validation: full suite green (261+ tests), ruff clean, e2e smoke shows clean
   teaser (whole paths, no `[recortado]`) + topic keeps the full set. Hook
   re-fired in runtime and produced `(+N omitted)` output — fix live.
+
+## 2026-07-15 — third review: tag-overflow truncation-flag loss
+
+Third adversarial pass on `compact_items` caught a subtle flag bug: the
+`(+N omitted)` tag's `while kept` loop could empty `kept` entirely when one
+whole item fit but the tag did not, falling back to `compact_value(unique[0])`
+which returns `truncated=False` — silently dropping the omission signal and the
+count. Fix: stop popping at `len(kept) >= 2`, so a single fitting item is kept
+whole (without a tag when one won't fit) and `truncated` stays True. Regression
+test `test_compact_items_keeps_whole_item_and_flag_when_tag_does_not_fit`.
+Suite green, ruff clean.
+
+## 2026-07-15 — fourth review: fuzz-found len<=limit contract breach
+
+Adversarial fuzz (60k cases) of `compact_items` + `compact_value` found that
+`_truncate_at_tail` always appended the ` …` elision (2 chars) even when that
+pushed `len(result) > limit` for tiny limits (limit 1-3). Never triggered in
+production (`_FIELD_LIMITS` are all >= 100) but it broke the hard contract
+`len(result) <= limit`, which `render_active_fields` relies on to avoid its
+`ValueError` that would lose the whole handoff. Fix: `budget <= 0` hard-
+truncates to the limit, and a trailing `[:limit]` safety net. Added
+`test_compact_respects_len_limit_for_tiny_limits` (limits 1-11). Re-fuzz:
+0 violations across 60k cases. Fuzz false positives (substring-count dedup
+check) identified and discarded.
+
+## 2026-07-15 — ecosystem ollama context audit + ollama-summarize fix
+
+Audited every ollama consumer for the smart-trim context bug (input cap
+disconnected from num_ctx + silent truncation). Findings:
+- **smart-trim**: was the only outlier — now fixed (cap+num_ctx aligned).
+- **pdf-extract-structured / diff-review / extract-tool-output**: already follow
+  the correct pattern (input cap + num_ctx scaled/aligned + truncation marked).
+  pdf-extract even documents the anti-pattern smart-trim had.
+- **codeq**: BODY_BUDGET 2.5KB cap is intentional + marked (`[NOTE: BODY
+  TRUNCATED]`) for a 4B model on one-function context. Sane.
+- **prompt-improve**: no input cap (prompt is small by nature) + explicit
+  num_ctx 8K/16K. Sane.
+- **ollama-summarize.py**: `--context-size 12K` cap but called `generate()`
+  WITHOUT num_ctx → depended on the model's Modelfile default (fragile). Fixed:
+  pass `num_ctx=8192` aligned to the 12K-char cap (~4K tokens). Single script,
+  low risk.
+- **cheap-llm**: NOT touched — graduated/frozen helper, 7 consumers; its design
+  is to delegate context to the caller. Forcing num_ctx would change behavior
+  for all consumers. Documented, left intact.
+- compact_value evidence-retention: a planned improvement turned out unnecessary
+  — `_evidence` already self-caps at `max(24, limit//2)`, so oversized evidence
+  never reaches the head+tail path. Regression test added anyway
+  (`test_compact_value_error_evidence_preserved_when_too_long_for_head_tail`).
+
+## 2026-07-15 — ecosystem cap alignment (maximize model context, RTX 5080)
+
+User directive: caps that degrade ollama-model quality must be raised to the
+model's native window + VRAM ceiling, not left at arbitrary low defaults.
+Audited every consumer and raised the sub-optimal caps (each verified within
+its project's tests):
+
+| Project | Cap | Before → After | Rationale |
+|---|---|---|---|
+| codeq `shared/llm.py` | BODY_BUDGET | 2500 → 6000 | real model is 9B (TeichAI/Qwen3.5-9B-Fable), not "4B" (stale comment fixed); 6KB fits num_ctx 8192 |
+| diff-review.py | MAX_DIFF_FOR_LLM | 26000 → 60000 | ~18K tokens, within num_ctx 32768; large diffs reviewed whole |
+| ollama-summarize.py | --context-size | 12000 → 40000 | cryptidbleh 128K-native/3.4GB; + num_ctx 8192→16384 |
+| ollama-summarize.py | num_ctx | 8192 → 16384 | aligned to 40K-char cap (~12K tokens) |
+| web-research `config.py` | WEB_SYNTH_MAX_CONTEXT_CHARS | 14000 → 40000 | feeds synth LLM (web_synth 9B 128K-native) |
+| web-research research | --max-chars | 4000 → 12000 | per-result extraction to fill the wider synth budget |
+
+Untouched (correct already or frozen): pdf-extract-structured (60K, num_ctx
+scaled), extract-tool-output (60K, head+tail+matches), prompt-improve
+(small-input, explicit num_ctx), cheap-llm (graduated/frozen helper, 7
+consumers — delegates context by design). Found pre-existing debt:
+web-research `build_parser` 99L (vertical-slice guard) — not introduced by
+these literal edits; left for the web-research project to address.

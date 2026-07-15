@@ -145,13 +145,18 @@ def _tail_overlaps_head(head: str, tail: str) -> bool:
 
 
 def _truncate_at_tail(value: str, limit: int, elision: str) -> str:
-    """Trunca al final respetando word-boundary; evita cortar palabras a medias."""
-    budget = max(1, limit - len(elision))
+    """Trunca al final respetando word-boundary; garantiza len(result) <= limit."""
+    if limit <= 0:
+        return ""
+    budget = limit - len(elision)
+    if budget <= 0:
+        # No room for the elision marker: hard-truncate to the limit.
+        return value[:limit]
     cut = value[:budget]
     boundary = cut.rfind(" ")
     if boundary >= budget // 2:
         cut = cut[:boundary]
-    return cut.rstrip(" ,;:|") + elision
+    return (cut.rstrip(" ,;:|") + elision)[:limit]
 
 
 def compact_value(value: str, limit: int, label: str) -> tuple[str, bool]:

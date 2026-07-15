@@ -309,6 +309,18 @@ def test_compact_items_keeps_whole_item_and_flag_when_tag_does_not_fit():
     assert truncated is True, "omission flag must survive when tag won't fit"
 
 
+def test_compact_respects_len_limit_for_tiny_limits():
+    # Regression (fuzz-found): _truncate_at_tail appended the elision marker even
+    # when it pushed len(result) past the limit for tiny limits. len <= limit is
+    # the hard contract of both compacters — it must hold for ALL limits >= 1,
+    # or render_active_fields raises ValueError and loses the handoff.
+    for limit in range(1, 12):
+        rv, _ = active_renderer.compact_value("a long value here", limit, "Task")
+        assert len(rv) <= limit, f"compact_value len {len(rv)} > {limit}: {rv!r}"
+        ri, _ = active_renderer.compact_items(["abcdefghij", "xyz", "q"], limit, "Files")
+        assert len(ri) <= limit, f"compact_items len {len(ri)} > {limit}: {ri!r}"
+
+
 # --- compact_value -----------------------------------------------------------
 
 
@@ -350,6 +362,24 @@ def test_compact_value_error_field_keeps_evidence_in_middle():
     assert "/srv/app/parser.py:99" in result
     assert "[recortado]" not in result
     assert "…" in result
+
+
+def test_compact_value_error_evidence_preserved_when_too_long_for_head_tail():
+    # Evidence (many error-ids + paths) exceeds the head+tail budget. It is the
+    # critical signal, so it must survive (trimmed) instead of being dropped by
+    # a prose tail-truncate that keeps only the surrounding "noise".
+    value = (
+        ("noise " * 30)
+        + " ".join(f"E_BIG_{i} /srv/app/m{i}.py:9{i}" for i in range(12))
+        + (" tail " * 20)
+    )
+    result, truncated = active_renderer.compact_value(value, 120, "Errors")
+    assert truncated is True
+    assert len(result) <= 120
+    assert "[recortado]" not in result
+    assert any(f"E_BIG_{i}" in result for i in range(3)), (
+        f"evidence lost to tail-trunc; got {result!r}"
+    )
 
 
 def test_compact_value_overlapping_head_tail_falls_back_to_tail():
