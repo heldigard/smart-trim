@@ -81,3 +81,32 @@ Hook shim: `~/.claude/hooks/smart-trim.py` (21L) → `smart_trim.features.precom
   "Rotate " preserved + value masked), foreign route correct.
 - 2026-07-15T01:34:50Z | status:completed | Objective grounding is project-local first; the legacy global objective is used only when the local registry is absent, never when a present local record is invalid or terminal. Regression coverage and full validation pass.
 - 2026-07-15T02:28:08Z | status:completed | Second pass confines grounding reads to resolved targets under their project/state root and rejects oversized memory/objective files. Outside-project objective symlinks and over-64KB objectives now fail closed with regressions.
+
+## 2026-07-14 — observability topic + smoke subcommand
+
+- `features/observability/command.py` (165L, new): append-only JSON-line event
+  log for PreCompact. Default OFF (`SMART_TRIM_OBSERVABILITY=1` to enable).
+  Records `method`, `route`, `trigger`, `latency_ms`, `in`/`out` bytes,
+  `model_chain` (every tier actually attempted, not just the winner), and a
+  sha256[:12] session hash (48-bit fingerprint, not reversible). No prompt
+  content, no paths, no error strings — only counters + structural metadata.
+  Topic is `topics/compact-events.md`; auto-registered in `topics/_index.md`
+  on first write. Failures are debug-only (the recorder must never block
+  compaction, even when the topic disk is full).
+- Orchestrator wiring: `_resolve_summary` now returns
+  `(text, method, preserved, model_chain)`; `_try_local` and `_try_cloud`
+  return `(text, method, attempted_chain)` so the recorder sees a hung
+  primary even when secondary ultimately succeeded. `handle_precompact`
+  records both the active and skipped paths with wall-clock latency from
+  `time.monotonic()`. Existing tests updated to the new return shapes; no
+  external API change (handle_precompact still returns the same dict).
+- `capabilities command.py` gained the `smoke` subcommand. It spawns the
+  wired shim (`~/.claude/hooks/smart-trim.py`) with a synthetic PreCompact
+  payload and exits 0 on a valid hook contract, 2 on missing shim, 3 on
+  timeout, 5 on unparseable stdout. Tests intercept `subprocess.run` so
+  CI runners without the shim path still pass.
+- 248 pytest green (+22 new: 11 observability, 8 capabilities, 3 re-anchored
+  precompact return-shape), ruff lint+format clean, layout gate clean.
+  precompact/command.py 284L → 358L; ALLOWLIST comment updated to mention
+  observability event recording. Live e2e via the Claude shim wrote one
+  compact-events.md entry on a synthetic payload.
