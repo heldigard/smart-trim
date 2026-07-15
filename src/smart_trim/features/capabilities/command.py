@@ -1,8 +1,18 @@
-"""Help and capability discovery that never enters the compaction pipeline."""
+"""Help and capability discovery that never enters the compaction pipeline.
+
+The ``smoke`` subcommand spawns the wired shim path
+(``~/.claude/hooks/smart-trim.py``) with a synthetic PreCompact payload so
+the smoke catches shim / sys.path / dependency drift alongside orchestrator
+bugs — calling the in-process orchestrator directly would not.
+"""
 
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any
 
 CAPABILITIES: tuple[dict[str, Any], ...] = (
@@ -26,6 +36,16 @@ CAPABILITIES: tuple[dict[str, Any], ...] = (
         "cost": "cheap",
         "writes": "none",
     },
+    {
+        "name": "smoke",
+        "purpose": "End-to-end hook smoke with a synthetic PreCompact payload.",
+        "read_only": False,
+        "destructive": False,
+        "idempotent": True,
+        "open_world": True,
+        "cost": "fast",
+        "writes": ".memory-bank/activeContext.md (when the synthetic payload forces one)",
+    },
 )
 
 
@@ -40,13 +60,14 @@ def capabilities_payload() -> dict[str, Any]:
 
 
 def help_text() -> str:
-    return """usage: smart-trim [--help] [--version] [capabilities [--json]]
+    return """usage: smart-trim [--help] [--version] [capabilities [--json]] [smoke]
 
 PreCompact hook that preserves a grounded project handoff before context
 compression. Normal hook mode reads one JSON event from stdin.
 
 commands:
   capabilities          show side effects, cost, and degradation contract
+  smoke                 run a synthetic PreCompact payload end-to-end (debug aid)
 
 options:
   -h, --help            show this help
@@ -55,6 +76,52 @@ options:
 hook smoke:
   printf '{"trigger":"manual","sessionId":"smoke","cwd":"/project"}' | smart-trim
 """
+
+
+def run_smoke(extra_env: dict[str, str] | None = None) -> int:
+    """Run the wired shim with a synthetic payload and print OK/FAIL line.
+
+    Returns the subprocess exit code. The synthetic payload carries
+    ``sessionId="smoke"`` so the deterministic offline fallback path produces
+    a minimal handoff without requiring a real Claude/Ollama session.
+    """
+    cwd = str(Path.cwd())
+    payload = json.dumps({"trigger": "manual", "sessionId": "smoke", "cwd": cwd})
+    shim = Path.home() / ".claude" / "hooks" / "smart-trim.py"
+    if not shim.is_file():
+        print(f"[smoke] FAIL: shim not found at {shim}", file=sys.stderr)
+        return 2
+    env = {"SMART_TRIM_OBSERVABILITY": "0"}
+    if extra_env:
+        env.update(extra_env)
+    try:
+        result = subprocess.run(
+            [sys.executable, str(shim)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={**os.environ, **env},
+        )
+    except subprocess.TimeoutExpired:
+        print("[smoke] FAIL: hook timed out after 30s", file=sys.stderr)
+        return 3
+    except OSError as exc:
+        print(f"[smoke] FAIL: {exc}", file=sys.stderr)
+        return 4
+    stdout = (result.stdout or "").strip()
+    try:
+        parsed = json.loads(stdout) if stdout else None
+    except json.JSONDecodeError:
+        parsed = None
+    if result.returncode != 0:
+        print(f"[smoke] FAIL: exit={result.returncode}\n{result.stderr}", file=sys.stderr)
+        return result.returncode or 1
+    if not isinstance(parsed, dict) or "continue" not in parsed:
+        print(f"[smoke] FAIL: unparseable stdout: {stdout[:200]!r}", file=sys.stderr)
+        return 5
+    print(f"[smoke] OK: continue={parsed.get('continue')} method={parsed.get('method', '-')}")
+    return 0
 
 
 def handle_cli(args: list[str]) -> bool:
@@ -76,7 +143,9 @@ def handle_cli(args: list[str]) -> bool:
                     f"{item['cost']:<13} {item['writes']}  {item['purpose']}"
                 )
         return True
+    if args and args[0] == "smoke":
+        raise SystemExit(run_smoke())
     return False
 
 
-__all__ = ["CAPABILITIES", "capabilities_payload", "handle_cli", "help_text"]
+__all__ = ["CAPABILITIES", "capabilities_payload", "handle_cli", "help_text", "run_smoke"]

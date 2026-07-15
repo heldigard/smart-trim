@@ -16,12 +16,14 @@ META = 250
 # Each entry: relative path -> human reason. Keep this SHORT and re-review.
 ALLOWLIST: dict[str, str] = {
     # The PreCompact orchestrator is one end-to-end pipeline (resolve session ->
-    # ground -> LLM cascade -> augment -> archive -> rotate -> persist). The
-    # wall-clock budget threading (deadline -> _tier_timeout -> _try_local /
-    # _try_cloud) is cascade orchestration, not a separable responsibility;
-    # splitting it would fracture the single pipeline the late-binding
-    # monkeypatch contract relies on. Re-review if it grows past ~320L.
-    "features/precompact/command.py": "cohesive end-to-end PreCompact pipeline + cascade budget",
+    # ground -> LLM cascade -> augment -> archive -> rotate -> persist -> record
+    # observability event). The wall-clock budget threading (deadline ->
+    # _tier_timeout -> _try_local / _try_cloud) and the model_chain accumulator
+    # are cascade orchestration, not separable concerns; splitting either would
+    # fracture the single pipeline the late-binding monkeypatch contract relies
+    # on. Re-review if it grows past ~400L or if the LLM cascade stops being
+    # the dominant responsibility.
+    "features/precompact/command.py": "cohesive end-to-end PreCompact pipeline + cascade budget + observability event",
 }
 
 
