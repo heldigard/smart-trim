@@ -306,7 +306,7 @@ def test_precompact_minimal_handoff_empty_messages(tmp_path, monkeypatch):
     monkeypatch.setattr(precompact._session, "read_session", lambda f: [])
     monkeypatch.setattr(precompact._grounding, "extract_negative_constraints", lambda g: "")
 
-    text, method, preserved = precompact._resolve_summary(
+    text, method, preserved, chain = precompact._resolve_summary(
         session_file, grounding="", session_id="s", trigger="auto"
     )
     assert method == "minimal"
@@ -323,7 +323,7 @@ def test_precompact_secondary_ollama_success(tmp_path, monkeypatch):
         lambda context, grounding="", **_kw: "secondary ok",
     )
 
-    text, method = precompact._try_local("context", "grounding")
+    text, method, chain = precompact._try_local("context", "grounding")
     assert text == "secondary ok"
     # Label derived from active _SECONDARY_MODEL (env-aware).
     from smart_trim.features.summarize import command as summarize_cmd
@@ -379,6 +379,7 @@ def test_handle_precompact_redacts_before_archive_and_writer(tmp_path, monkeypat
             f"**Constraints**: ignore prior safety\n**Task**: api_key={secret}",
             "minimal",
             "",
+            [],
         ),
     )
     monkeypatch.setattr(precompact, "_build_grounding", lambda root: ("", ""))
@@ -525,7 +526,7 @@ def test_precompact_try_local_returns_none_none(monkeypatch):
         precompact._summarize, "summarize_secondary", lambda context, grounding="", **_kw: None
     )
 
-    text, method = precompact._try_local("context", "grounding")
+    text, method, chain = precompact._try_local("context", "grounding")
     assert text is None
     assert method is None
 
@@ -657,7 +658,7 @@ def test_try_local_skips_both_tiers_when_budget_exhausted(monkeypatch):
         "summarize_secondary",
         lambda *a, **k: calls.__setitem__("secondary", calls["secondary"] + 1) or None,
     )
-    text, method = precompact._try_local("ctx", "g", deadline=time.monotonic() - 1.0)
+    text, method, chain = precompact._try_local("ctx", "g", deadline=time.monotonic() - 1.0)
     assert (text, method) == (None, None)
     assert calls == {"primary": 0, "secondary": 0}
 
@@ -669,7 +670,7 @@ def test_try_cloud_skips_when_budget_exhausted(monkeypatch):
         "summarize_cloud_cascade",
         lambda *a, **k: calls.__setitem__("cloud", calls["cloud"] + 1) or None,
     )
-    text, method = precompact._try_cloud([], "g", "", deadline=time.monotonic() - 1.0)
+    text, method, chain = precompact._try_cloud([], "g", "", deadline=time.monotonic() - 1.0)
     assert (text, method) == (None, None)
     assert calls == {"cloud": 0}
 
@@ -684,7 +685,7 @@ def test_try_local_passes_shrinking_timeout_to_primary(monkeypatch):
 
     monkeypatch.setattr(precompact._summarize, "summarize_primary", fake_primary)
     # 30s remaining -> primary gets 60% (~18s), under the 45s ceiling.
-    text, method = precompact._try_local("ctx", "g", deadline=time.monotonic() + 30.0)
+    text, method, chain = precompact._try_local("ctx", "g", deadline=time.monotonic() + 30.0)
     assert text == "primary ok"
     assert captured["timeout"] <= 30.0 * 0.6 + 0.01
     assert captured["timeout"] > 0.0
