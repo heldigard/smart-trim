@@ -2,8 +2,8 @@
 
 Loads currentTask / recent progress / previous activeContext from the project's
 ``.memory-bank/`` so a compact preserves the real objective and verified state
-instead of drifting. Also surfaces the shared ``current-objective.json`` registry
-when it is fresh and belongs to this project.
+instead of drifting. The project-local control-plane objective is authoritative;
+the shared legacy registry is a fallback only when no local record exists.
 
 The freshness filter comes from the installed ``agent_memory`` package. It is
 optional at runtime: an unavailable or broken installation degrades to the raw
@@ -46,6 +46,9 @@ _RUNTIME_CONSTRAINT_NOISE_RE = re.compile(
     re.IGNORECASE,
 )
 
+MAX_MEMORY_FILE_BYTES = 256_000
+MAX_OBJECTIVE_FILE_BYTES = 64_000
+
 
 def load_memory_grounding(project_root: Path) -> str:
     """Load compact grounding from the agent memory bank (see module docstring)."""
@@ -64,18 +67,30 @@ def load_memory_grounding(project_root: Path) -> str:
 def _add_section(parts: list[str], path: Path, title: str, max_chars: int, from_end: bool) -> None:
     if not path.exists():
         return
-    lines = _filtered_memory_lines(path.name, path)
+    lines = _filtered_memory_lines(path.name, path, path.parent)
     if not lines:
         return
     text = _take_chars(lines, max_chars, from_end=from_end)
     parts.append(f"## {title}\n{redact_sensitive(text)}")
 
 
-def _filtered_memory_lines(name: str, path: Path) -> list[str]:
+def _safe_text(path: Path, allowed_root: Path, max_bytes: int) -> str | None:
+    """Read one bounded regular file only when its resolved target stays in scope."""
     try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
+        resolved = path.resolve(strict=True)
+        resolved.relative_to(allowed_root.resolve(strict=True))
+        if not resolved.is_file() or resolved.stat().st_size > max_bytes:
+            return None
+        return resolved.read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return None
+
+
+def _filtered_memory_lines(name: str, path: Path, bank: Path) -> list[str]:
+    text = _safe_text(path, bank, MAX_MEMORY_FILE_BYTES)
+    if text is None:
         return []
+    lines = text.splitlines()
     if _agent_memory_entries is not None:
         try:
             return _agent_memory_entries.filter_lines_for_injection(name, lines)
@@ -120,18 +135,29 @@ def _is_constraint_candidate(line: str) -> bool:
 
 
 def load_objective_registry(project_root: Path) -> str:
-    """Load the shared objective registry so compaction preserves task focus.
+    """Load the authoritative project objective so compaction preserves focus.
 
-    The agentic-cycle-router writes ~/.claude/state/current-objective.json when
-    the engineering cycle activates. Include it in the handoff so the next
-    session knows the current task, acceptance criteria, and next step.
+    New control-plane state lives under the project's memory bank. The global
+    file remains a compatibility fallback, but must never override a present
+    local record—even when that record is malformed or terminal—because doing
+    so can inject another session's stale objective after compaction.
     """
-    obj_file = Path.home() / ".claude" / "state" / "current-objective.json"
+    local_file = project_root / ".memory-bank" / "control-plane" / "current-objective.json"
+    local_present = local_file.exists() or local_file.is_symlink()
+    obj_file = (
+        local_file
+        if local_present
+        else Path.home() / ".claude" / "state" / "current-objective.json"
+    )
     if not obj_file.exists():
         return ""
+    allowed_root = project_root if local_present else Path.home() / ".claude" / "state"
+    raw = _safe_text(obj_file, allowed_root, MAX_OBJECTIVE_FILE_BYTES)
+    if raw is None:
+        return ""
     try:
-        data = json.loads(obj_file.read_text(encoding="utf-8", errors="replace"))
-    except (OSError, json.JSONDecodeError):
+        data = json.loads(raw)
+    except json.JSONDecodeError:
         return ""
     if not isinstance(data, dict) or _objective_stale_for_injection(data):
         return ""

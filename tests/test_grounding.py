@@ -154,6 +154,74 @@ def test_objective_registry_keeps_fresh_same_project(tmp_path, monkeypatch):
     assert "run focused tests" in out
 
 
+def test_project_local_objective_overrides_global_registry(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    project = tmp_path / "proj"
+    local = project / ".memory-bank" / "control-plane"
+    local.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    fresh = datetime.now(UTC).isoformat()
+    _write_objective(
+        home,
+        {"task": "legacy global", "project_root": str(project), "updated_at": fresh},
+    )
+    (local / "current-objective.json").write_text(
+        json.dumps(
+            {"task": "authoritative local", "project_root": str(project), "updated_at": fresh}
+        ),
+        encoding="utf-8",
+    )
+
+    out = grounding.load_objective_registry(project)
+    assert "authoritative local" in out
+    assert "legacy global" not in out
+
+
+def test_present_invalid_local_objective_does_not_fall_back_global(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    project = tmp_path / "proj"
+    local = project / ".memory-bank" / "control-plane"
+    local.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    _write_objective(
+        home,
+        {
+            "task": "legacy global",
+            "project_root": str(project),
+            "updated_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    (local / "current-objective.json").write_text("{invalid", encoding="utf-8")
+
+    assert grounding.load_objective_registry(project) == ""
+
+
+def test_local_objective_symlink_outside_project_is_rejected(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    project = tmp_path / "proj"
+    local = project / ".memory-bank" / "control-plane"
+    local.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    fresh = datetime.now(UTC).isoformat()
+    outside = tmp_path / "outside.json"
+    outside.write_text(json.dumps({"task": "outside data", "updated_at": fresh}))
+    (local / "current-objective.json").symlink_to(outside)
+
+    assert grounding.load_objective_registry(project) == ""
+
+
+def test_oversized_local_objective_is_rejected(tmp_path, monkeypatch):
+    project = tmp_path / "proj"
+    local = project / ".memory-bank" / "control-plane"
+    local.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (local / "current-objective.json").write_text(
+        "{" + ("x" * grounding.MAX_OBJECTIVE_FILE_BYTES) + "}", encoding="utf-8"
+    )
+
+    assert grounding.load_objective_registry(project) == ""
+
+
 def test_objective_registry_skips_terminal_status(tmp_path, monkeypatch):
     home = tmp_path / "home"
     project = tmp_path / "proj"

@@ -135,3 +135,4 @@ budget is the correct bound.
 284L) into `precompact/cascade.py` — the budget logic is cascade orchestration,
 not a separable responsibility, and splitting would fracture the late-binding
 monkeypatch contract. Used the layout ALLOWLIST instead (review if > ~320L).
+- 2026-07-15T01:34:50Z | Decision: a present project objective registry is authoritative, including invalid/terminal states; do not fall back to global state and risk cross-project contamination.

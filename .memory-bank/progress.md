@@ -79,3 +79,5 @@ Hook shim: `~/.claude/hooks/smart-trim.py` (21L) → `smart_trim.features.precom
   ruff lint+format clean. Two isolated e2e smokes via the live shim with real
   Ollama primary: active route wrote activeContext (Decisions line showed
   "Rotate " preserved + value masked), foreign route correct.
+- 2026-07-15T01:34:50Z | status:completed | Objective grounding is project-local first; the legacy global objective is used only when the local registry is absent, never when a present local record is invalid or terminal. Regression coverage and full validation pass.
+- 2026-07-15T02:28:08Z | status:completed | Second pass confines grounding reads to resolved targets under their project/state root and rejects oversized memory/objective files. Outside-project objective symlinks and over-64KB objectives now fail closed with regressions.
