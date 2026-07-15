@@ -20,7 +20,8 @@ What is recorded (no PII / no content):
 What is NOT recorded: prompt content, response content, file paths, error
 strings, cwd. Reversing the session hash requires brute-forcing a 48-bit space
 AND knowing the session id format — not worth it for an event channel that
-already gates on opt-in.
+already gates on opt-in. Collision probability among N events is ≈ N²/2^49,
+so for 10k events per project topic ≈ 1.8 × 10^-5 (birthday bound).
 """
 
 from __future__ import annotations
@@ -54,8 +55,6 @@ class CompactEvent:
     session_id: str = "unknown"
 
 
-# Default OFF. Test fixtures flip this on via monkeypatch.setenv.
-_DEFAULT_ENABLED = False
 _TOPIC_SLUG = "compact-events"
 _REDACTED = "[REDACTED]"
 
@@ -70,12 +69,25 @@ def session_hash(session_id: str) -> str:
     """Return a non-reversible 12-char fingerprint of the session id.
 
     SHA-256 truncated to 48 bits is sufficient to spot a single session
-    re-appearing in the topic (collision probability across 10k events ≈ 0.3%
-    — the topic is per-project and rarely exceeds that scale) without making
-    the id recoverable.
+    re-appearing in the topic (collision probability among 10k events is ≈
+    N²/2^49 ≈ 1.8 × 10^-5 — birthday bound) without making the id recoverable.
     """
     digest = hashlib.sha256(str(session_id).encode("utf-8", errors="replace")).hexdigest()
     return digest[:12]
+
+
+def _safe_int(value: object, default: int = 0) -> int:
+    """Coerce ``value`` to a non-negative int, falling back to ``default``.
+
+    Defensive: the dataclass field is typed ``int`` but Python does not
+    enforce this at runtime, and a caller passing ``"500"`` is fine while
+    ``"foo"`` or ``None`` would crash. The recorder never wants a malformed
+    event to bubble up — it is best-effort by contract.
+    """
+    try:
+        return max(0, int(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
 
 
 def record_compact_event(project_root: Path, event: CompactEvent) -> bool:
@@ -94,9 +106,9 @@ def record_compact_event(project_root: Path, event: CompactEvent) -> bool:
             "method": _safe_label(event.method),
             "route": _safe_label(event.route),
             "trigger": _safe_label(event.trigger),
-            "latency_ms": max(0, int(event.latency_ms)),
-            "in": max(0, int(event.input_bytes)),
-            "out": max(0, int(event.output_bytes)),
+            "latency_ms": _safe_int(event.latency_ms),
+            "in": _safe_int(event.input_bytes),
+            "out": _safe_int(event.output_bytes),
             "chain": [_safe_label(m) for m in event.model_chain if m],
             "sid": session_hash(event.session_id),
         }

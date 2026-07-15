@@ -182,3 +182,17 @@ def test_unwritable_root_returns_false_not_raises(tmp_path):
         CompactEvent(method="x", route="x", trigger="x"),
     )
     assert wrote is False
+
+
+def test_safe_int_coerces_string_numeric():
+    from smart_trim.features.observability.command import _safe_int
+
+    assert _safe_int("500") == 500
+
+
+def test_safe_int_falls_back_on_nonsense():
+    from smart_trim.features.observability.command import _safe_int
+
+    assert _safe_int("foo") == 0
+    assert _safe_int(None) == 0
+    assert _safe_int(object()) == 0

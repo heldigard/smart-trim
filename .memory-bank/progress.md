@@ -110,3 +110,26 @@ Hook shim: `~/.claude/hooks/smart-trim.py` (21L) → `smart_trim.features.precom
   precompact/command.py 284L → 358L; ALLOWLIST comment updated to mention
   observability event recording. Live e2e via the Claude shim wrote one
   compact-events.md entry on a synthetic payload.
+
+## 2026-07-15 — second review: observability + capabilities hardening
+
+Second-pass review found 3 issues in the previous commit:
+
+1. **Dead code**: `_DEFAULT_ENABLED = False` in observability/command.py was a
+   leftover constant never referenced anywhere (the gate reads env at call
+   time via `observability_enabled()`). Removed.
+
+2. **Collision math wrong**: `session_hash` docstring claimed "0.3%" collision
+   probability at 10k events — off by ~4 orders of magnitude. Correct birthday
+   bound is N²/2^49 ≈ 1.8 × 10^-5 at N=10k. Fixed in docstring and module
+   docstring.
+
+3. **Non-int latency_ms crash risk**: `CompactEvent` fields are typed `int` but
+   Python does not enforce at runtime. A caller passing `"500"` or `None`
+   would crash `int()` inside `record_compact_event`. Outer `try/except` in
+   `_record_event` masks it but logs noise at debug level. Added `_safe_int`
+   defensive coercion (returns 0 on TypeError/ValueError) + 2 new tests
+   (`test_safe_int_coerces_string_numeric`, `test_safe_int_falls_back_on_nonsense`).
+
+Total: 260 pytest green (+2: _safe_int coercion tests), ruff lint+format
+clean, layout gate clean.
