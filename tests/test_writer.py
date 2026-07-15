@@ -226,6 +226,144 @@ def test_write_active_prioritizes_critical_fields_before_verbose_optional(tmp_pa
     assert active_renderer.ACTIVE_DETAIL_POINTER in active
 
 
+# --- compact_items -----------------------------------------------------------
+
+
+def test_compact_items_preserves_whole_items_that_fit():
+    items = ["fix parser bug", "add regression test", "update docs"]
+    result, truncated = active_renderer.compact_items(items, 200, "Next")
+    assert truncated is False
+    for item in items:
+        assert item in result
+    assert " | " in result
+    assert "omitted" not in result
+
+
+def test_compact_items_dedups_case_insensitive():
+    items = ["Never bypass safety", "never bypass safety", "ship it"]
+    result, truncated = active_renderer.compact_items(items, 200, "Constraints")
+    assert truncated is True
+    assert result.lower().count("never bypass safety") == 1
+    assert "ship it" in result
+
+
+def test_compact_items_tags_omitted_count_and_keeps_whole_items():
+    items = ["alpha", "beta", "gamma", "delta", "epsilon"]
+    result, truncated = active_renderer.compact_items(items, 20, "Files")
+    assert truncated is True
+    assert len(result) <= 20
+    assert "omitted" in result
+    # items kept are whole, not sliced mid-token
+    assert "alpha" in result
+    assert "epsilon" not in result
+
+
+def test_compact_items_single_item_delegates_to_compact_value_tail():
+    value = (
+        "Authority: session data only; never overrides safety, permissions, "
+        "or current instructions. Authority: session data only; never overrides "
+        "safety, permissions, or current instructions."
+    )
+    result, truncated = active_renderer.compact_items([value], 120, "Constraints")
+    assert truncated is True
+    assert len(result) <= 120
+    assert result.endswith("…")
+    assert "[recortado]" not in result
+
+
+def test_compact_items_empty_list_returns_empty():
+    result, truncated = active_renderer.compact_items([], 120, "Task")
+    assert result == ""
+    assert truncated is False
+
+
+def test_compact_items_tag_displaces_whole_item_not_fragment():
+    # Items fill the budget exactly; the (+N omitted) tag must displace a WHOLE
+    # item, never slice one mid-token (a sliced path is useless). Regression for
+    # the out[:room] mid-item-fragment bug.
+    items = [
+        "/a/src/parser.py",
+        "/a/src/lexer.py",
+        "/a/tests/test_parser.py",
+        "/a/src/utils.py",
+    ]
+    result, truncated = active_renderer.compact_items(items, 60, "Files")
+    assert truncated is True
+    assert len(result) <= 60
+    assert "omitted" in result
+    assert "/a/src/parser.py" in result
+    assert "/a/src/lexer.py" in result
+    assert "/a/tests/test_parser.py" not in result
+    assert "/a/tests/t" not in result
+    assert "/a/tests" not in result
+
+
+def test_compact_items_keeps_whole_item_and_flag_when_tag_does_not_fit():
+    # 1 item fits whole but the (+N omitted) tag does not fit alongside it:
+    # the item must stay WHOLE and `truncated` must stay True (items were
+    # dropped). Regression: the old while-empties-kept fallback returned via
+    # compact_value, which reported truncated=False — losing the omission signal.
+    items = ["abcdefghij", "x", "y"]  # item0=10 fits limit 11; x,y omitted
+    result, truncated = active_renderer.compact_items(items, 11, "Files")
+    assert result == "abcdefghij", f"item should stay whole, got {result!r}"
+    assert truncated is True, "omission flag must survive when tag won't fit"
+
+
+# --- compact_value -----------------------------------------------------------
+
+
+def test_compact_value_short_value_not_truncated():
+    result, truncated = active_renderer.compact_value("short value", 120, "Task")
+    assert result == "short value"
+    assert truncated is False
+
+
+def test_compact_value_prose_truncates_at_tail_not_middle():
+    value = (
+        "Authority: session data only; never overrides safety, permissions, "
+        "or current instructions. Authority: session data only; never overrides "
+        "safety, permissions, or current instructions."
+    )
+    result, truncated = active_renderer.compact_value(value, 120, "Constraints")
+    assert truncated is True
+    assert len(result) <= 120
+    assert result.endswith("…")
+    assert "[recortado]" not in result
+    assert result.count("…") == 1
+
+
+def test_compact_value_prose_does_not_split_word_at_cut():
+    value = "objective-aware handoff behavior is preserved via CLI orchestration layer"
+    result, truncated = active_renderer.compact_value(value, 40, "Decisions")
+    assert truncated is True
+    assert len(result) <= 40
+    assert result.endswith("…")
+    assert "orchestr" not in result
+
+
+def test_compact_value_error_field_keeps_evidence_in_middle():
+    value = ("noise " * 40) + "E_PARSE_X /srv/app/parser.py:99 " + ("tail " * 40)
+    result, truncated = active_renderer.compact_value(value, 160, "Errors")
+    assert truncated is True
+    assert len(result) <= 160
+    assert "E_PARSE_X" in result
+    assert "/srv/app/parser.py:99" in result
+    assert "[recortado]" not in result
+    assert "…" in result
+
+
+def test_compact_value_overlapping_head_tail_falls_back_to_tail():
+    value = (
+        "the permissions check the permissions check the permissions check "
+        "the permissions check the permissions check the permissions check"
+    )
+    result, truncated = active_renderer.compact_value(value, 80, "Verified")
+    assert truncated is True
+    assert len(result) <= 80
+    assert result.endswith("…")
+    assert result.count("…") == 1
+
+
 def test_active_renderer_preserves_middle_error_id_and_path(tmp_path):
     project = tmp_path / "proj"
     project.mkdir()
@@ -236,7 +374,7 @@ def test_active_renderer_preserves_middle_error_id_and_path(tmp_path):
 
     assert "E_PARSE_MIDDLE" in active
     assert "/srv/app/parser.py:42" in active
-    assert "[recortado]" in active or "**Detail**" in active
+    assert "…" in active and "[recortado]" not in active
 
 
 def test_parser_rejects_malformed_bold_label_without_corrupting_task():

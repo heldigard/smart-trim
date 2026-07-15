@@ -5,14 +5,19 @@
 `~/.claude/hooks/smart-trim.py` (1114L) into its own vertical-slice package,
 mirroring the `codeq` project layout.
 
-## Architecture: vertical-slice hook package (NOT a CLI)
+## Architecture: vertical-slice hook package with diagnostic CLI
 
-smart-trim is a **PreCompact hook**, not a CLI. Entry point is
+smart-trim is primarily a **PreCompact hook**. Its authoritative event entry point is
 `~/.claude/hooks/smart-trim.py` — a ~20-line **shim** that does only:
 `from smart_trim.features.precompact.command import main; main()`. The hook is
 wired in `~/.claude/settings.json` (`python3 ~/.claude/hooks/smart-trim.py`) and
 reached by Gemini via a symlink (`~/.gemini/hooks/smart-trim.py`). The shim
 preserves that wired path so neither settings.json nor the symlink moves.
+
+The installed `smart-trim` console entry exposes `--help`, `--version`,
+`capabilities`, and `smoke`; with no CLI arguments it accepts the same hook JSON
+on stdin. Keep operational event behavior in the hook pipeline rather than
+growing a general-purpose command application.
 
 ## Layout
 
@@ -52,9 +57,11 @@ src/smart_trim/
    `agent_memory.features.entries.command` module. Never restore a file-path
    import from `~/.claude/scripts/`; missing agent-memory must degrade to raw
    memory-bank lines — see `features/grounding/command.py`.
-3. **Output is byte-identical** to the v3.2 monolith for the same input — the
-   split is pure reorganization. `handle_precompact` returns the same dict,
-   writes the same `activeContext.md` and `~/.claude/summaries/` artifacts.
+3. **Normal hook behavior stays compatible**, but byte identity with v3.2 is no
+   longer a contract. Post-split fixes intentionally changed method labels,
+   archive names, redaction, bounded rendering, routing, and recovery behavior.
+   Preserve the public hook schema and fail-open guarantees; cover intentional
+   persistence changes with regression tests.
 
 ## Commands
 
@@ -77,4 +84,5 @@ src/smart_trim/
   `~/.claude/scripts/` helpers resolve from any CWD the hook runs under.
 - `precompact/command.py` imports sibling feature modules instead of their
   functions — deliberate late binding so monkeypatch in tests works.
-- No `[project.scripts]` in pyproject — it's a hook, not a CLI.
+- `[project.scripts]` intentionally exposes diagnostics and hook-compatible
+  stdin handling; the wired shim remains the authoritative runtime entry.

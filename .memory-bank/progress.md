@@ -133,3 +133,51 @@ Second-pass review found 3 issues in the previous commit:
 
 Total: 260 pytest green (+2: _safe_int coercion tests), ruff lint+format
 clean, layout gate clean.
+
+## 2026-07-15 — fail-open, CI, and harness integration audit
+
+- Session ingestion now drops valid JSON scalars/lists instead of letting them
+  reach dict-only extraction, treats negative tail-byte configuration as an
+  error rather than an accidental unbounded read, tolerates non-string text
+  blocks, and ignores one unreadable JSONL while selecting the newest readable
+  session.
+- Unexpected local Ollama client exceptions now fall through to the remaining
+  cloud/rule-based tiers. Observability integer coercion is Mypy-clean and
+  absorbs non-finite floats without violating its best-effort contract.
+- CI now exercises Python 3.11, 3.12, and 3.13 and enforces at least 95% source
+  coverage. Project docs now describe the diagnostic console entry and no
+  longer claim byte identity with the v3.2 monolith.
+- Harness drift corrected: Codex base reasoning matches the documented Sol
+  `medium` default, and the live Claude shim is a symlink to the tracked
+  template; Codex and Gemini continue to chain through that same path.
+- The `smoke` subcommand now clears live Claude session variables and runs
+  against a temporary bank with a terminal local objective, preventing the
+  global objective fallback from overwriting real handoffs. A live smoke was
+  verified by before/after checksums of both active and deep handoff files.
+- Final validation: 256 tests collected, 98.69% coverage, Ruff lint/format,
+  Mypy, Pyright, Semgrep, Gitleaks, Vulture, diff/YAML checks, wheel build, and
+  live Claude/Codex shim smokes all green.
+- 2026-07-15T16:22:33Z | status:completed | 2026-07-15 cross-CLI integration validated: smart-trim remains the single PreCompact continuity layer for Claude and the protocol-compatible Codex/Gemini path used by Antigravity; objective-aware handoff behavior is preserved while UserPromptSubmit composition and coordination stay in cli-orchestration. Full project gates plus graduated Claude/Codex shim E2E and global hook resolution pass.
+
+## 2026-07-15 — handoff truncation + context/model tuning (2-pass review)
+
+Codex incident: `.memory-bank/activeContext.md` shipped with literal `…[recortado]…`
+markers glued mid-line + head/tail semantic overlap. Two review passes:
+- **writer/active.py**: `compact_value` else-branch was head+tail (overlap) →
+  tail-truncate with `…` + word-boundary. New `compact_items` (item-aware):
+  dedup + whole items joined ` | ` + `(+N omitted)` tag that displaces whole
+  items (never fragments one). Bug caught in review: the tag's `out[:room]`
+  sliced the last item mid-token → rewritten to pop whole items. active.py
+  ALLOWLISTed (309L, cohesive renderer).
+- **summarize + shared/config (context)**: `num_ctx` was 32768 but gemma4-e2b
+  is 128K-native/3.4GB → raised to 65536 (env `SMART_TRIM_NUM_CTX`, fail-open
+  parse). Second review found the REAL bottleneck: `extract_context_for_summary`
+  capped input at `MAX_CONTEXT_FOR_SUMMARY=20000` chars before the model, so the
+  bigger num_ctx was moot — raised to 50000 (env `SMART_TRIM_MAX_CONTEXT_LOCAL`).
+  ollama-bench RANKING.md confirms cascade (e2b #1 11.81 → cryptidbleh #2 → cloud)
+  already optimal; gemma4-12b NOT promoted (lower score, slower, 256K window
+  unneeded). ollama-client reviewed: num_ctx propagation verified, 122 tests +
+  ruff green, API frozen.
+- Validation: full suite green (261+ tests), ruff clean, e2e smoke shows clean
+  teaser (whole paths, no `[recortado]`) + topic keeps the full set. Hook
+  re-fired in runtime and produced `(+N omitted)` output — fix live.

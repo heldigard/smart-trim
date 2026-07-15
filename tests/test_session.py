@@ -72,6 +72,16 @@ def test_read_session_parses_jsonl(tmp_path):
     assert len(msgs) == 2
 
 
+def test_read_session_skips_valid_non_object_json(tmp_path):
+    f = tmp_path / "mixed.jsonl"
+    f.write_text(
+        '[]\nnull\n42\n"text"\n' + json.dumps({"type": "assistant"}) + "\n",
+        encoding="utf-8",
+    )
+
+    assert session.read_session(f) == [{"type": "assistant"}]
+
+
 def test_read_session_missing_file_returns_empty(tmp_path):
     assert session.read_session(tmp_path / "nope.jsonl") == []
 
@@ -256,6 +266,27 @@ def test_find_latest_session_jsonl_resolves_newest(monkeypatch, tmp_path):
     assert session.find_latest_session_jsonl() is None
 
 
+def test_find_latest_session_jsonl_skips_one_unreadable_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_SESSION_ID", "sess-1")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    project = tmp_path / ".claude" / "projects" / "proj"
+    project.mkdir(parents=True)
+    unreadable = project / "bad.jsonl"
+    readable = project / "good.jsonl"
+    unreadable.write_text("{}\n", encoding="utf-8")
+    readable.write_text("{}\n", encoding="utf-8")
+    original_stat = Path.stat
+
+    def fake_stat(self, *args, **kwargs):
+        if self == unreadable:
+            raise OSError("permission denied")
+        return original_stat(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", fake_stat)
+
+    assert session.find_latest_session_jsonl() == readable
+
+
 def test_find_latest_session_jsonl_handles_unreadable_projects_root(monkeypatch, tmp_path):
     monkeypatch.setenv("CLAUDE_SESSION_ID", "sess-1")
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -382,6 +413,18 @@ def test_content_extraction_edge_cases():
     assert '{"status": "ok"}' in out
 
 
+def test_content_extraction_coerces_non_string_text_blocks():
+    blocks = [
+        {"type": "text", "text": 123},
+        {"type": "tool_result", "content": [{"type": "text", "text": False}]},
+    ]
+
+    out = content._extract_text_from_content(blocks, "assistant")
+
+    assert "123" in out
+    assert "False" in out
+
+
 def test_collect_project_jsonls_oserror(monkeypatch, tmp_path):
     projects_dir = tmp_path / "projects"
     projects_dir.mkdir()
@@ -418,6 +461,11 @@ def test_search_session_id_all_projects_invalid():
 
 def test_session_tail_bytes_value_error(monkeypatch):
     monkeypatch.setenv("SMART_TRIM_SESSION_TAIL_BYTES", "not-a-number")
+    assert session._session_tail_bytes() == 4 * 1024 * 1024
+
+
+def test_session_tail_bytes_negative_uses_bounded_default(monkeypatch):
+    monkeypatch.setenv("SMART_TRIM_SESSION_TAIL_BYTES", "-1")
     assert session._session_tail_bytes() == 4 * 1024 * 1024
 
 

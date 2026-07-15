@@ -37,6 +37,17 @@ _SECONDARY_MODEL = os.environ.get(
 )
 _DEFAULT_CLOUD_MODEL = "deepseek/deepseek-v4-flash"
 _CLOUD_MODEL = os.environ.get("SMART_TRIM_CLOUD_MODEL", _DEFAULT_CLOUD_MODEL)
+# num_ctx: gemma4-e2b supports 128K natively and weighs 3.4GB Q4, so the RTX
+# 5080 (16GB) has ~9GB of headroom for the KV cache — 64K captures long
+# compacting sessions without truncating the input tail (done_reason=length),
+# at ~7GB total (model + KV). Env-overridable for VRAM-tight hosts. Default
+# 65536 (was 32768): 32K left 75% of the model's native window unused. A bad
+# env value falls back to the default rather than crashing the hook on import
+# (fail-open; mirrors config.py's MAX_CONTEXT_FOR_SUMMARY parse).
+try:
+    _NUM_CTX = int(os.environ.get("SMART_TRIM_NUM_CTX", "65536"))
+except ValueError:
+    _NUM_CTX = 65536
 
 
 def get_summary_prompt(context: str, grounding: str = "") -> str:
@@ -84,8 +95,10 @@ def summarize_ollama(
     try:
         # cache=False: PreCompact payloads are large and rarely identical; avoid
         # storing multi-KB summaries in the shared generation cache.
-        # num_ctx=32768: a compacting session can exceed the model's default 8K
-        # window; without this, smaller-ctx models return empty (done_reason=length).
+        # num_ctx=_NUM_CTX: a compacting session can exceed the model's default
+        # 8K window; without this, smaller-ctx models return empty
+        # (done_reason=length). Default 65536 fits gemma4-e2b's 128K native
+        # window and the RTX 5080's 16GB (see _NUM_CTX).
         return compat.ollama_client.chat(
             messages,
             model=model,
@@ -94,10 +107,13 @@ def summarize_ollama(
             think=False,
             base_url=OLLAMA_BASE,
             cache=False,
-            num_ctx=32768,
+            num_ctx=_NUM_CTX,
             timeout=timeout,
         )
-    except compat.ollama_client.OllamaUnavailable:
+    except Exception:
+        # The local helper is optional and its transport/parser exceptions can
+        # evolve independently. Every local failure must fall through to the
+        # secondary/cloud/rule-based tiers instead of aborting PreCompact.
         return None
 
 

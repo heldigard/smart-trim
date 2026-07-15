@@ -79,7 +79,8 @@ def _extract_from_block(block: dict[str, Any], text_cap: int, result_cap: int) -
     """Extract text from a single content block by its type."""
     btype = block.get("type", "")
     if btype == "text":
-        return [block.get("text", "")[:text_cap]]
+        text = block.get("text", "")
+        return [str(text)[:text_cap]] if text is not None else []
     if btype == "tool_use":
         name = block.get("name", "unknown")
         inp = json.dumps(block.get("input", {}), ensure_ascii=False)[:200]
@@ -108,7 +109,9 @@ def _extract_from_result_list(items: list[Any], cap: int) -> list[str]:
     parts: list[str] = []
     for item in items:
         if isinstance(item, dict) and item.get("type") == "text":
-            parts.append(f"[Result: {item.get('text', '')[:cap]}]")
+            text = item.get("text", "")
+            if text is not None:
+                parts.append(f"[Result: {str(text)[:cap]}]")
     return parts
 
 

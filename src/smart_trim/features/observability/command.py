@@ -84,9 +84,11 @@ def _safe_int(value: object, default: int = 0) -> int:
     ``"foo"`` or ``None`` would crash. The recorder never wants a malformed
     event to bubble up — it is best-effort by contract.
     """
+    if not isinstance(value, (str, bytes, bytearray, int, float)):
+        return default
     try:
-        return max(0, int(value))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+        return max(0, int(value))
+    except (OverflowError, TypeError, ValueError):
         return default
 
 

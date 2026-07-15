@@ -52,7 +52,7 @@ _LABEL_RE = re.compile(
 )
 _CANONICAL_LABELS = {label.lower(): label for label in _FIELD_PRIORITY}
 _CANONICAL_LABELS["session constraints (quoted)"] = "Constraints"
-_VALUE_ELISION = " …[recortado]… "
+_VALUE_ELISION = " …"
 _PATH_RE = re.compile(
     r"(?:[A-Za-z]:\\[A-Za-z0-9._\\/ -]+|/(?:[A-Za-z0-9._@%+,-]+/)*"
     r"[A-Za-z0-9._@%+,-]+(?::\d+)?)"
@@ -135,6 +135,25 @@ def _evidence(value: str, label: str, limit: int) -> str:
     return " | ".join(kept)
 
 
+def _tail_overlaps_head(head: str, tail: str) -> bool:
+    """True si head y tail repiten tokens (solapamiento semantico)."""
+    head_words = {w.lower().strip(".,;:|") for w in head.split() if len(w) > 2}
+    tail_words = {w.lower().strip(".,;:|") for w in tail.split() if len(w) > 2}
+    if not tail_words:
+        return False
+    return len(head_words & tail_words) >= 2
+
+
+def _truncate_at_tail(value: str, limit: int, elision: str) -> str:
+    """Trunca al final respetando word-boundary; evita cortar palabras a medias."""
+    budget = max(1, limit - len(elision))
+    cut = value[:budget]
+    boundary = cut.rfind(" ")
+    if boundary >= budget // 2:
+        cut = cut[:boundary]
+    return cut.rstrip(" ,;:|") + elision
+
+
 def compact_value(value: str, limit: int, label: str) -> tuple[str, bool]:
     if len(value) <= limit:
         return value, False
@@ -145,12 +164,67 @@ def compact_value(value: str, limit: int, label: str) -> tuple[str, bool]:
         if budget >= 16:
             head = max(1, int(budget * 0.6))
             tail = max(1, budget - head)
-            compact = f"{value[:head]}{separator}{evidence}{separator}{value[-tail:]}"
-            return compact[:limit], True
-    budget = max(2, limit - len(_VALUE_ELISION))
-    head = max(1, int(budget * 0.65))
-    tail = max(1, budget - head)
-    return f"{value[:head]}{_VALUE_ELISION}{value[-tail:]}", True
+            head_text = value[:head]
+            tail_text = value[-tail:]
+            if not _tail_overlaps_head(head_text, tail_text):
+                compact = f"{head_text}{separator}{evidence}{separator}{tail_text}"
+                return compact[:limit], True
+    return _truncate_at_tail(value, limit, _VALUE_ELISION), True
+
+
+def compact_items(values: list[str], limit: int, label: str) -> tuple[str, bool]:
+    """Compact a list of items preserving WHOLE items (never mid-item slices).
+
+    Dedups (case-insensitive, order-preserving), fills the budget greedily with
+    intact items joined by ' | ', and tags how many were dropped as
+    '(+N omitted)'. A single item, or the first item when none fit, is shrunk
+    via compact_value (evidence for Errors/Files, tail for prose). Dropped
+    items are not lost: the deep handoff in topics/session-handoffs.md keeps
+    them (activeContext is the bounded teaser + **Detail** pointer).
+    """
+    separator = " | "
+    seen: set[str] = set()
+    unique: list[str] = []
+    for raw in values:
+        item = raw.strip()
+        key = item.lower()
+        if item and key not in seen:
+            seen.add(key)
+            unique.append(item)
+    if not unique:
+        return "", False
+    if len(unique) == 1:
+        return compact_value(unique[0], limit, label)
+
+    kept: list[str] = []
+    used = 0
+    for item in unique:
+        addition = len(item) + (len(separator) if kept else 0)
+        if used + addition <= limit:
+            kept.append(item)
+            used += addition
+    if not kept:
+        return compact_value(unique[0], limit, label)
+
+    omitted = len(unique) - len(kept)
+    out = separator.join(kept)
+    truncated = omitted > 0 or len(unique) < len(values)
+    if omitted:
+        tag = f" (+{omitted} omitted)"
+        # The (+N omitted) tag displaces WHOLE items, never fragments one, and
+        # never empties kept below 1. Stop popping at len(kept) >= 2 so a single
+        # fitting item stays whole: when even one item + tag won't fit, we keep
+        # the item whole WITHOUT a tag rather than recur into compact_value,
+        # which would silently drop the truncation signal and the omitted count.
+        while len(kept) >= 2 and len(out) + len(tag) > limit:
+            kept.pop()
+            omitted = len(unique) - len(kept)
+            tag = f" (+{omitted} omitted)"
+            out = separator.join(kept)
+        if len(out) + len(tag) <= limit:
+            out += tag
+        truncated = True
+    return out[:limit], truncated
 
 
 def render_active_fields(summary: str, header_lines: list[str]) -> list[str]:
@@ -165,8 +239,7 @@ def render_active_fields(summary: str, header_lines: list[str]) -> list[str]:
         nonlocal omitted
         if not values:
             return
-        joined = " | ".join(values)
-        compact, truncated = compact_value(joined, _FIELD_LIMITS[label], label)
+        compact, truncated = compact_items(values, _FIELD_LIMITS[label], label)
         display_label = "Session constraints (quoted)" if label == "Constraints" else label
         candidate = f"- **{display_label}**: {compact}"
         prospective = "\n".join([*header_lines, *rendered, candidate]) + "\n"

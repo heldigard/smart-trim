@@ -33,7 +33,17 @@ def test_handle_cli_smoke_raises_system_exit():
         stdout=fake_payload,
         stderr="",
     )
-    with mock.patch.object(caps.subprocess, "run", return_value=fake_proc) as run_mock:
+    with (
+        mock.patch.object(caps.subprocess, "run", return_value=fake_proc) as run_mock,
+        mock.patch.dict(
+            caps.os.environ,
+            {
+                "CLAUDE_SESSION_FILE": "/real/session.jsonl",
+                "CLAUDE_SESSION_ID": "real-session",
+                "CLAUDE_PROJECT_DIR": "/real/project",
+            },
+        ),
+    ):
         try:
             caps.handle_cli(["smoke"])
         except SystemExit as exc:
@@ -46,6 +56,9 @@ def test_handle_cli_smoke_raises_system_exit():
         args, kwargs = called
         assert "smart-trim.py" in str(args[0][1])
         assert "input" in kwargs and kwargs["input"] != ""  # synthetic payload piped
+        assert json.loads(kwargs["input"])["cwd"] != str(caps.Path.cwd())
+        for name in ("CLAUDE_SESSION_FILE", "CLAUDE_SESSION_ID", "CLAUDE_PROJECT_DIR"):
+            assert name not in kwargs["env"]
 
 
 def test_handle_cli_returns_false_for_unknown_args():

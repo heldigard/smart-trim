@@ -79,7 +79,7 @@ separators), and deterministic fallback output preserves first occurrence order.
 **Decision**: `writer.update_agent_memory` returns its persistence route
 (`active`/`foreign`/`error`); `policy.final_message` renders it so the
 PreCompact systemMessage never claims an activeContext update that was routed
-to `topics/foreign-sessions.md` or silently failed. `_final_message` moved
+to foreign-session storage or silently failed. `_final_message` moved
 from precompact/command.py to policy.py (250L gate + cohesion: policy owns
 both hook return dicts).
 
@@ -136,3 +136,5 @@ budget is the correct bound.
 not a separable responsibility, and splitting would fracture the late-binding
 monkeypatch contract. Used the layout ALLOWLIST instead (review if > ~320L).
 - 2026-07-15T01:34:50Z | Decision: a present project objective registry is authoritative, including invalid/terminal states; do not fall back to global state and risk cross-project contamination.
+- 2026-07-15 | Decision: summarize num_ctx raised 32768→65536 (env `SMART_TRIM_NUM_CTX`). gemma4-e2b supports 128K natively and weighs 3.4GB Q4; RTX 5080 16GB holds ~7GB at 64K ctx (model+KV). 32K left 75% of the native window unused → long sessions truncated (done_reason=length). PRIMARY stays `batiai/gemma4-e2b:q4` (ollama-bench smart_trim #1, 11.81); `gemma4-12b` (256K native, 7.4GB, score 11.35) NOT promoted — lower score + slower, and e2b's 128K already covers needs at half the VRAM. Cascade (e2b→cryptidbleh→deepseek-cloud) confirmed optimal vs RANKING.md.
+- 2026-07-15 | Decision: activeContext truncation is item-aware, not blob-slice. `compact_items` (writer/active.py) dedups + fills the budget with WHOLE items (` | `-joined) + a `(+N omitted)` tag that displaces whole items, never fragments one; a single oversized item delegates to `compact_value` (evidence for Errors/Files, tail-truncate `…` + word-boundary for prose). Replaced the `…[recortado]…` mid-line marker — root cause of the Codex incident (marker glued mid-line + head/tail semantic overlap, e.g. `permissions, o …[recortado]… permissions`). Full handoff detail remains in the archived session-handoffs topic; activeContext is the bounded teaser. active.py ALLOWLISTed at 309L (cohesive single-responsibility renderer).

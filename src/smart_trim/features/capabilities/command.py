@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +45,7 @@ CAPABILITIES: tuple[dict[str, Any], ...] = (
         "idempotent": True,
         "open_world": True,
         "cost": "fast",
-        "writes": ".memory-bank/activeContext.md (when the synthetic payload forces one)",
+        "writes": "temporary isolated memory bank only",
     },
 )
 
@@ -85,24 +86,36 @@ def run_smoke(extra_env: dict[str, str] | None = None) -> int:
     ``sessionId="smoke"`` so the deterministic offline fallback path produces
     a minimal handoff without requiring a real Claude/Ollama session.
     """
-    cwd = str(Path.cwd())
-    payload = json.dumps({"trigger": "manual", "sessionId": "smoke", "cwd": cwd})
     shim = Path.home() / ".claude" / "hooks" / "smart-trim.py"
     if not shim.is_file():
         print(f"[smoke] FAIL: shim not found at {shim}", file=sys.stderr)
         return 2
-    env = {"SMART_TRIM_OBSERVABILITY": "0"}
+    env = dict(os.environ)
+    env["SMART_TRIM_OBSERVABILITY"] = "0"
     if extra_env:
         env.update(extra_env)
+    for name in ("CLAUDE_SESSION_FILE", "CLAUDE_SESSION_ID", "CLAUDE_PROJECT_DIR"):
+        env.pop(name, None)
     try:
-        result = subprocess.run(
-            [sys.executable, str(shim)],
-            input=payload,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env={**os.environ, **env},
-        )
+        with tempfile.TemporaryDirectory(prefix="smart-trim-smoke-") as temp_dir:
+            smoke_root = Path(temp_dir)
+            # A present terminal local objective suppresses the legacy global
+            # objective fallback. The synthetic no-transcript path then skips
+            # persistence, so smoke cannot overwrite a real project handoff.
+            objective = smoke_root / ".memory-bank" / "control-plane" / "current-objective.json"
+            objective.parent.mkdir(parents=True)
+            objective.write_text('{"status":"completed"}', encoding="utf-8")
+            payload = json.dumps(
+                {"trigger": "manual", "sessionId": "smoke", "cwd": str(smoke_root)}
+            )
+            result = subprocess.run(
+                [sys.executable, str(shim)],
+                input=payload,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
+            )
     except subprocess.TimeoutExpired:
         print("[smoke] FAIL: hook timed out after 30s", file=sys.stderr)
         return 3

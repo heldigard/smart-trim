@@ -196,3 +196,4 @@ def test_safe_int_falls_back_on_nonsense():
     assert _safe_int("foo") == 0
     assert _safe_int(None) == 0
     assert _safe_int(object()) == 0
+    assert _safe_int(float("inf")) == 0

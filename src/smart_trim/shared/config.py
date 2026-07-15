@@ -47,16 +47,19 @@ OLLAMA_LIVENESS_TIMEOUT = 0.5
 
 # --- Context caps ----------------------------------------------------------
 try:
-    MAX_CONTEXT_FOR_SUMMARY = int(os.environ.get("SMART_TRIM_MAX_CONTEXT_LOCAL", "20000"))
+    MAX_CONTEXT_FOR_SUMMARY = int(os.environ.get("SMART_TRIM_MAX_CONTEXT_LOCAL", "50000"))
 except ValueError:
-    MAX_CONTEXT_FOR_SUMMARY = 20000
+    MAX_CONTEXT_FOR_SUMMARY = 50000
 
 try:
     MAX_CONTEXT_FOR_CLOUD = int(os.environ.get("SMART_TRIM_MAX_CONTEXT_CLOUD", "100000"))
 except ValueError:
     MAX_CONTEXT_FOR_CLOUD = 100000
-# Cloud tier gets a larger cap than local's 20K — preserves early decisions
-# / root-causes in long sessions approaching compact.
+# Cloud tier gets a larger cap than local's 50K — preserves early decisions
+# / root-causes in long sessions approaching compact. Local 50K (~12-17K
+# tokens) is paired with num_ctx=65536 (see summarize): gemma4-e2b (4.6B,
+# 3.4GB) holds it in the RTX 5080's 16GB. Was 20K, which left num_ctx mostly
+# unused; the cap is the real input bottleneck, not the model window.
 MAX_FALLBACK_SUMMARY = 3000  # Max chars for rule-based fallback
 
 # --- Cascade wall-clock budget ------------------------------------------------

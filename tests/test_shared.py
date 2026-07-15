@@ -282,7 +282,7 @@ def test_config_env_overrides(monkeypatch):
     monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_LOCAL", "invalid")
     monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_CLOUD", "invalid")
     importlib.reload(config)
-    assert config.MAX_CONTEXT_FOR_SUMMARY == 20000
+    assert config.MAX_CONTEXT_FOR_SUMMARY == 50000
     assert config.MAX_CONTEXT_FOR_CLOUD == 100000
 
     # Clean up by restoring defaults

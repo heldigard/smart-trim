@@ -42,10 +42,17 @@ def find_latest_session_jsonl() -> Path | None:
     all_jsonl = _collect_project_jsonls(projects_root)
     if not all_jsonl:
         return None
-    try:
-        return max(all_jsonl, key=lambda p: p.stat().st_mtime)
-    except (OSError, ValueError):
-        return None
+    latest: Path | None = None
+    latest_mtime = float("-inf")
+    for candidate in all_jsonl:
+        try:
+            mtime = candidate.stat().st_mtime
+        except OSError:
+            continue
+        if mtime > latest_mtime:
+            latest = candidate
+            latest_mtime = mtime
+    return latest
 
 
 def _has_claude_session_env() -> bool:
@@ -174,11 +181,14 @@ _SESSION_TAIL_BYTES_DEFAULT = 4 * 1024 * 1024
 
 def _session_tail_bytes() -> int:
     try:
-        return int(
+        value = int(
             os.environ.get("SMART_TRIM_SESSION_TAIL_BYTES", str(_SESSION_TAIL_BYTES_DEFAULT))
         )
     except ValueError:
         return _SESSION_TAIL_BYTES_DEFAULT
+    # Zero deliberately opts into a full read. Negative values are almost
+    # certainly configuration mistakes and must not silently do the same.
+    return value if value >= 0 else _SESSION_TAIL_BYTES_DEFAULT
 
 
 def read_session(session_file: Path) -> list[dict[str, Any]]:
@@ -210,9 +220,10 @@ def _parse_jsonl_line(line: str) -> dict[str, Any] | None:
     if not line.strip():
         return None
     try:
-        return json.loads(line)
+        parsed = json.loads(line)
     except json.JSONDecodeError:
         return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 __all__ = [

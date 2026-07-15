@@ -24,6 +24,11 @@ ALLOWLIST: dict[str, str] = {
     # on. Re-review if it grows past ~400L or if the LLM cascade stops being
     # the dominant responsibility.
     "features/precompact/command.py": "cohesive end-to-end PreCompact pipeline + cascade budget + observability event",
+    # Bounded, provenance-aware renderer for activeContext.md — one
+    # responsibility (label parse -> evidence extraction -> bounded compact ->
+    # atomic write). compact_value + its word-boundary/overlap helpers are the
+    # rendering pipeline; splitting would scatter the truncation contract.
+    "features/writer/active.py": "cohesive activeContext.md renderer (parse -> evidence -> compact -> atomic write)",
 }
 
 

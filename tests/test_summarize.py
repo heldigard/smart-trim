@@ -64,13 +64,42 @@ def test_summarize_ollama_returns_client_output(monkeypatch):
     assert call["model"] == "qwen3.5:4b"
     assert call["think"] is False
     assert call["cache"] is False
-    assert call["num_ctx"] == 32768
+    assert call["num_ctx"] == 65536
     assert call["num_predict"] == summarize.SUMMARY_NUM_PREDICT == 384
+
+
+def test_summarize_ollama_num_ctx_env_override(monkeypatch):
+    """SMART_TRIM_NUM_CTX overrides the context window (RTX 5080 headroom)."""
+    fake = _FakeOllamaClient(result="ok")
+    monkeypatch.setattr(compat, "ollama_client", fake)
+    monkeypatch.setattr(summarize, "_NUM_CTX", 98304)
+    summarize.summarize_ollama("ctx", "qwen3.5:4b")
+    assert fake.calls[0]["num_ctx"] == 98304
+
+
+def test_num_ctx_invalid_env_falls_back_to_default(monkeypatch):
+    """A bad SMART_TRIM_NUM_CTX must not crash the hook on import (fail-open)."""
+    import importlib
+
+    monkeypatch.setenv("SMART_TRIM_NUM_CTX", "not-a-number")
+    try:
+        importlib.reload(summarize)
+        assert summarize._NUM_CTX == 65536
+    finally:
+        monkeypatch.delenv("SMART_TRIM_NUM_CTX", raising=False)
+        importlib.reload(summarize)
 
 
 def test_summarize_ollama_swallows_unavailable(monkeypatch):
     fake = _FakeOllamaClient(exc=_FakeOllamaUnavailable("down"))
     monkeypatch.setattr(compat, "ollama_client", fake)
+    assert summarize.summarize_ollama("ctx", "m") is None
+
+
+def test_summarize_ollama_swallows_unexpected_client_error(monkeypatch):
+    fake = _FakeOllamaClient(exc=RuntimeError("malformed local response"))
+    monkeypatch.setattr(compat, "ollama_client", fake)
+
     assert summarize.summarize_ollama("ctx", "m") is None
 
 

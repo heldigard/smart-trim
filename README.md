@@ -24,6 +24,10 @@ Vertical-slice package (`src/smart_trim/{shared,features}/`), graduated from a
 1114-line monolith. See `CLAUDE.md`. Entry point is the thin shim
 `~/.claude/hooks/smart-trim.py`.
 
+The `smart-trim` console entry is an operational surface for capabilities,
+version checks, smoke tests, and hook-compatible stdin; it does not replace the
+wired shim.
+
 ## Install (dev)
 
 ```bash
