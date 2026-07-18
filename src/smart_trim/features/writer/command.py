@@ -149,8 +149,8 @@ _META_SIGNALS = (
 # Bounded to one readdir per parent; guarded so a slow/unmounted volume cannot
 # block compaction.
 _PROJECT_PARENTS = (
-    "/mnt/wsl/PHYSICALDRIVE2p1",
-    "/mnt/wsl/PHYSICALDRIVE2p1/ProyectosGP",
+    "/mnt/ext4disk",
+    "/mnt/ext4disk/ProyectosGP",
     "/mnt/ext4disk/ProyectosP",
     "/mnt/c/Users",
 )
@@ -197,7 +197,7 @@ def _is_foreign_session(summary: str, project_root: Path) -> bool:
 
     Absolute-path detection first: if the summary carries any path and none fall
     under project_root, the session is foreign (e.g. working on
-    /mnt/wsl/.../Elogix from a ~ host dir).
+    /mnt/ext4disk/.../Elogix from a ~ host dir).
 
     Name/home guard: a HOME-rooted session (the shared meta bank) is foreign
     unless its summary references the harness. This stops project work described
