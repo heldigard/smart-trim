@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 
@@ -116,6 +118,43 @@ def test_update_topic_index_dedups(tmp_path):
     writer.update_topic_index(topics, "x", "X")  # second call must NOT duplicate
     idx = (topics / "_index.md").read_text(encoding="utf-8")
     assert idx.count("(x.md)") == 1
+
+
+def test_concurrent_topic_appends_preserve_every_entry_and_single_index(tmp_path):
+    topics = tmp_path / "topics"
+    topics.mkdir()
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(
+            pool.map(
+                lambda index: writer.append_project_topic(
+                    tmp_path, "Concurrent Topic", f"entry-{index}"
+                ),
+                range(24),
+            )
+        )
+
+    content = (topics / "concurrent-topic.md").read_text(encoding="utf-8")
+    index_content = (topics / "_index.md").read_text(encoding="utf-8")
+    assert content.count("# Concurrent Topic\n") == 1
+    assert content.count("\n## ") == 24
+    assert all(f"entry-{index}\n" in content for index in range(24))
+    assert index_content.count("(concurrent-topic.md)") == 1
+
+
+def test_busy_topic_lock_skips_optional_write(monkeypatch, tmp_path):
+    @contextmanager
+    def busy_lock(_handle, **_kwargs):
+        yield False
+
+    monkeypatch.setattr(writer.filelock, "try_exclusive_lock", busy_lock)
+
+    writer.append_project_topic(tmp_path, "Busy Topic", "must not block")
+
+    topic = tmp_path / "topics" / "busy-topic.md"
+    assert topic.exists()
+    assert topic.read_text(encoding="utf-8") == ""
+    assert not (tmp_path / "topics" / "_index.md").exists()
 
 
 # --- _is_foreign_session -----------------------------------------------------

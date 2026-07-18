@@ -208,6 +208,7 @@ def test_cloud_tier_used_when_ollama_down(tmp_path, monkeypatch):
 
 
 def test_minimal_handoff_when_no_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     project = tmp_path / "project"
     (project / ".memory-bank").mkdir(parents=True)
     _disable_external(monkeypatch)
@@ -234,6 +235,7 @@ def test_minimal_handoff_when_no_session(tmp_path, monkeypatch):
 
 
 def test_precompact_does_not_persist_postcompact_rules(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     project = tmp_path / "project"
     (project / ".memory-bank").mkdir(parents=True)
     active_path = project / ".memory-bank" / "activeContext.md"

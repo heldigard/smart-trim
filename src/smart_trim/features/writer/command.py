@@ -8,6 +8,7 @@ sessions (file paths outside this bank's root) are routed to a
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,7 @@ from smart_trim.features.writer.active import (
     mark_handoff_non_authoritative,
     render_active_fields,
 )
+from smart_trim.shared import filelock
 from smart_trim.shared.paths import get_project_root, redact_sensitive, slugify
 
 
@@ -42,12 +44,12 @@ def update_agent_memory(
         safe_summary = mark_handoff_non_authoritative(redact_sensitive(summary))
         handoff_body = f"Method: {method}\nSession: {session_id}\n\n{safe_summary}"
         if _is_foreign_session(safe_summary, project_root):
-            _append_topic(memory_dir, "foreign-sessions", handoff_body)
+            append_project_topic(memory_dir, "foreign-sessions", handoff_body)
             return "foreign"
         # Create the recovery target before publishing an active-context
         # pointer to it. If either write fails, the previous active handoff is
         # left intact by the outer best-effort boundary.
-        _append_topic(memory_dir, "session-handoffs", handoff_body)
+        append_project_topic(memory_dir, "session-handoffs", handoff_body)
         _write_active(memory_dir, safe_summary, method)
         return "active"
     except Exception:
@@ -66,42 +68,45 @@ def _write_active(memory_dir: Path, safe_summary: str, method: str) -> None:
     atomic_write_text(active, "\n".join(lines[:ACTIVE_CONTEXT_MAX_LINES]) + "\n")
 
 
-def _append_topic(memory_dir: Path, title: str, content: str) -> None:
-    """Append to ``topics/<slug>.md`` + register in ``topics/_index.md``.
-
-    Thin wrapper around append_project_topic kept for the foreign/handoff split.
-    """
-    append_project_topic(memory_dir, title, content)
-
-
 def append_project_topic(memory_dir: Path, title: str, content: str) -> None:
     topics_dir = memory_dir / "topics"
     topics_dir.mkdir(parents=True, exist_ok=True)
     slug = slugify(title)
     topic = topics_dir / f"{slug}.md"
-    if not topic.exists():
-        topic.write_text(
-            f"# {title}\n> Deep memory topic. Read on demand; keep entries factual.\n",
-            encoding="utf-8",
-        )
+    with topic.open("a+", encoding="utf-8") as handle:
+        with filelock.try_exclusive_lock(handle, timeout_seconds=0.25) as acquired:
+            if not acquired:
+                return
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(
+                    f"# {title}\n> Deep memory topic. Read on demand; keep entries factual.\n"
+                )
+            handle.write(f"\n## {datetime.now().isoformat(timespec='seconds')}\n")
+            handle.write(content.strip()[:4000] + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
     update_topic_index(topics_dir, slug, title)
-    with topic.open("a", encoding="utf-8") as handle:
-        handle.write(f"\n## {datetime.now().isoformat(timespec='seconds')}\n")
-        handle.write(content.strip()[:4000] + "\n")
 
 
 def update_topic_index(topics_dir: Path, slug: str, title: str) -> None:
     index = topics_dir / "_index.md"
-    if not index.exists():
-        index.write_text(
-            "# Topic Index\n> Deep agent memory. Search/read on demand; "
-            "do not load all topics by default.\n\n## Topics\n",
-            encoding="utf-8",
-        )
-    content = index.read_text(encoding="utf-8", errors="replace")
-    if f"({slug}.md)" not in content:
-        with index.open("a", encoding="utf-8") as handle:
-            handle.write(f"- [{title}]({slug}.md)\n")
+    with index.open("a+", encoding="utf-8") as handle:
+        with filelock.try_exclusive_lock(handle, timeout_seconds=0.25) as acquired:
+            if not acquired:
+                return
+            handle.seek(0)
+            content = handle.read()
+            if not content:
+                handle.write(
+                    "# Topic Index\n> Deep agent memory. Search/read on demand; "
+                    "do not load all topics by default.\n\n## Topics\n"
+                )
+            if f"({slug}.md)" not in content:
+                handle.seek(0, os.SEEK_END)
+                handle.write(f"- [{title}]({slug}.md)\n")
+            handle.flush()
+            os.fsync(handle.fileno())
 
 
 # Harness/meta signals. The HOME meta bank is a catch-all for sessions launched

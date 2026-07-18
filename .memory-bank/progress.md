@@ -252,3 +252,5 @@ scaled), extract-tool-output (60K, head+tail+matches), prompt-improve
 consumers — delegates context by design). Found pre-existing debt:
 web-research `build_parser` 99L (vertical-slice guard) — not introduced by
 these literal edits; left for the web-research project to address.
+- 2026-07-17T15:51:29Z | status:completed | Hardened numeric/Ollama configuration and concurrent memory writes; restored the 250-line layout gate and verified the complete pytest, Ruff, formatting, hook, security, and secret-scan gates.
+- 2026-07-17T16:20:20Z | status:completed | 2026-07-17 completion pass: generalized local endpoint validation to all literal loopback IPs, reduced global always-on rules to 10,797/12,000 tokens, pinned active MCP packages, anchored stable uv/uvx paths, and disabled Antigravity non-workspace access. Full suites, cross-CLI authority/hooks/shims/model/RTK audits and codescan all are clean.

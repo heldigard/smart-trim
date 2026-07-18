@@ -6,6 +6,8 @@ effects, no imports beyond stdlib — safe to import from anywhere.
 
 from __future__ import annotations
 
+import ipaddress
+import math
 import os
 import re
 from urllib.parse import urlparse
@@ -14,11 +16,39 @@ from urllib.parse import urlparse
 _DEFAULT_OLLAMA_BASE = "http://localhost:11434"
 
 
+def _is_loopback_host(hostname: str | None) -> bool:
+    """Accept localhost or a literal IP from the operating-system loopback range."""
+    if not hostname:
+        return False
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def _positive_int(value: str | None, default: int) -> int:
+    try:
+        parsed = int(value, 10) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _positive_float(value: str | None, default: float) -> float:
+    try:
+        parsed = float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+    return parsed if math.isfinite(parsed) and parsed > 0 else default
+
+
 def _resolve_ollama_base() -> str:
     """Endpoint override: ``SMART_TRIM_OLLAMA_BASE`` first, then the standard
-    ``OLLAMA_HOST`` (bare ``host:port`` accepted). Invalid values fall back to
-    the localhost default so a typo can never disable the local cascade AND
-    the liveness probe simultaneously in inconsistent ways."""
+    ``OLLAMA_HOST`` (bare ``host:port`` accepted). Only plain-HTTP loopback
+    endpoints are accepted; remote, credentialed, or malformed values fall
+    back to localhost so compacted session context never leaves the machine."""
     raw = (
         (os.environ.get("SMART_TRIM_OLLAMA_BASE") or os.environ.get("OLLAMA_HOST") or "")
         .strip()
@@ -30,12 +60,26 @@ def _resolve_ollama_base() -> str:
         raw = f"http://{raw}"
     try:
         parsed = urlparse(raw)
-        if not parsed.hostname:
-            return _DEFAULT_OLLAMA_BASE
-        parsed.port  # noqa: B018 — raises ValueError on a malformed port
-    except ValueError:
+        hostname = parsed.hostname
+        port = parsed.port
+    except (UnicodeError, ValueError):
         return _DEFAULT_OLLAMA_BASE
-    return raw
+    if (
+        parsed.scheme != "http"
+        or not _is_loopback_host(hostname)
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+        or port == 0
+    ):
+        return _DEFAULT_OLLAMA_BASE
+    assert hostname is not None  # established by _is_loopback_host above
+    rendered_host = f"[{hostname}]" if ":" in hostname else hostname
+    rendered_port = f":{port}" if port is not None else ""
+    return f"http://{rendered_host}{rendered_port}"
 
 
 OLLAMA_BASE = _resolve_ollama_base()
@@ -46,15 +90,9 @@ OLLAMA_TIMEOUT_SECONDS = 45.0
 OLLAMA_LIVENESS_TIMEOUT = 0.5
 
 # --- Context caps ----------------------------------------------------------
-try:
-    MAX_CONTEXT_FOR_SUMMARY = int(os.environ.get("SMART_TRIM_MAX_CONTEXT_LOCAL", "50000"))
-except ValueError:
-    MAX_CONTEXT_FOR_SUMMARY = 50000
-
-try:
-    MAX_CONTEXT_FOR_CLOUD = int(os.environ.get("SMART_TRIM_MAX_CONTEXT_CLOUD", "100000"))
-except ValueError:
-    MAX_CONTEXT_FOR_CLOUD = 100000
+MAX_CONTEXT_FOR_SUMMARY = _positive_int(os.environ.get("SMART_TRIM_MAX_CONTEXT_LOCAL"), 50000)
+MAX_CONTEXT_FOR_CLOUD = _positive_int(os.environ.get("SMART_TRIM_MAX_CONTEXT_CLOUD"), 100000)
+OLLAMA_NUM_CTX = _positive_int(os.environ.get("SMART_TRIM_NUM_CTX"), 65536)
 # Cloud tier gets a larger cap than local's 50K — preserves early decisions
 # / root-causes in long sessions approaching compact. Local 50K (~12-17K
 # tokens) is paired with num_ctx=65536 (see summarize): gemma4-e2b (4.6B,
@@ -69,10 +107,7 @@ MAX_FALLBACK_SUMMARY = 3000  # Max chars for rule-based fallback
 # is persisted). Each tier's per-call timeout shrinks with the remaining
 # budget; once it is exhausted the cascade fails OPEN to rule-based fallback.
 # Must stay below the host's PreCompact hook timeout; env-tunable.
-try:
-    CASCADE_BUDGET_SECONDS = float(os.environ.get("SMART_TRIM_CASCADE_BUDGET_SECONDS", "40"))
-except ValueError:
-    CASCADE_BUDGET_SECONDS = 40.0
+CASCADE_BUDGET_SECONDS = _positive_float(os.environ.get("SMART_TRIM_CASCADE_BUDGET_SECONDS"), 40.0)
 # Don't start a tier with less than this left — it would just fail and waste a
 # round-trip. Kept above the local generation floor so healthy summaries on a
 # warm model still complete.

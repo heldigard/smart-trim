@@ -4,3 +4,4 @@
 ## Topics
 - [Code map](code-map.md)
 - [session-handoffs](session-handoffs.md)
+- [foreign-sessions](foreign-sessions.md)

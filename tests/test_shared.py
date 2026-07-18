@@ -375,34 +375,42 @@ def test_redact_is_idempotent_under_double_application():
 # --- Ollama endpoint env override --------------------------------------------
 
 
-def test_ollama_base_env_override_full_url(monkeypatch):
+@pytest.mark.parametrize(
+    ("value", "expected_host"),
+    [
+        ("http://127.0.0.1:11500", "127.0.0.1"),
+        ("http://127.0.0.2:11500", "127.0.0.2"),
+        ("http://[::1]:11500", "::1"),
+    ],
+)
+def test_ollama_base_env_override_accepts_loopback_url(monkeypatch, value, expected_host):
     import importlib
 
     from smart_trim.shared import config
 
-    monkeypatch.setenv("SMART_TRIM_OLLAMA_BASE", "http://10.0.0.5:11500")
+    monkeypatch.setenv("SMART_TRIM_OLLAMA_BASE", value)
     importlib.reload(config)
     try:
-        assert config.OLLAMA_BASE == "http://10.0.0.5:11500"
-        assert config.OLLAMA_HOST == "10.0.0.5"
+        assert config.OLLAMA_BASE == value
+        assert config.OLLAMA_HOST == expected_host
         assert config.OLLAMA_PORT == 11500
     finally:
         monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
         importlib.reload(config)
 
 
-def test_ollama_base_env_override_bare_hostport(monkeypatch):
+def test_ollama_base_env_override_accepts_bare_loopback_hostport(monkeypatch):
     import importlib
 
     from smart_trim.shared import config
 
-    monkeypatch.setenv("OLLAMA_HOST", "remote-box:11434")
+    monkeypatch.setenv("OLLAMA_HOST", "localhost:11500")
     monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
     importlib.reload(config)
     try:
-        assert config.OLLAMA_BASE == "http://remote-box:11434"
-        assert config.OLLAMA_HOST == "remote-box"
-        assert config.OLLAMA_PORT == 11434
+        assert config.OLLAMA_BASE == "http://localhost:11500"
+        assert config.OLLAMA_HOST == "localhost"
+        assert config.OLLAMA_PORT == 11500
     finally:
         monkeypatch.delenv("OLLAMA_HOST", raising=False)
         importlib.reload(config)

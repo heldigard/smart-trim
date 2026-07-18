@@ -12,7 +12,7 @@ only runs when both local tiers are down — keeps most summaries on-machine.
 import os
 
 from smart_trim.shared import compat
-from smart_trim.shared.config import OLLAMA_BASE, OLLAMA_TIMEOUT_SECONDS
+from smart_trim.shared.config import OLLAMA_BASE, OLLAMA_NUM_CTX, OLLAMA_TIMEOUT_SECONDS
 
 _SYSTEM_PROMPT = (
     "You are a context compression expert. Max 280 words. "
@@ -44,10 +44,7 @@ _CLOUD_MODEL = os.environ.get("SMART_TRIM_CLOUD_MODEL", _DEFAULT_CLOUD_MODEL)
 # 65536 (was 32768): 32K left 75% of the model's native window unused. A bad
 # env value falls back to the default rather than crashing the hook on import
 # (fail-open; mirrors config.py's MAX_CONTEXT_FOR_SUMMARY parse).
-try:
-    _NUM_CTX = int(os.environ.get("SMART_TRIM_NUM_CTX", "65536"))
-except ValueError:
-    _NUM_CTX = 65536
+_NUM_CTX = OLLAMA_NUM_CTX
 
 
 def get_summary_prompt(context: str, grounding: str = "") -> str:

@@ -282,3 +282,42 @@ def test_cloud_model_env_override_changes_model_and_label(monkeypatch):
     finally:
         monkeypatch.delenv("SMART_TRIM_CLOUD_MODEL", raising=False)
         importlib.reload(sum_cmd)
+
+
+def test_invalid_numeric_environment_falls_back_to_safe_defaults(monkeypatch):
+    import importlib
+
+    from smart_trim.features.summarize import command as sum_cmd
+    from smart_trim.shared import config
+
+    monkeypatch.setenv("SMART_TRIM_NUM_CTX", "-1")
+    monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_LOCAL", "0")
+    monkeypatch.setenv("SMART_TRIM_MAX_CONTEXT_CLOUD", "invalid")
+    monkeypatch.setenv("SMART_TRIM_CASCADE_BUDGET_SECONDS", "inf")
+    importlib.reload(config)
+    importlib.reload(sum_cmd)
+    try:
+        assert sum_cmd._NUM_CTX == 65536
+        assert config.MAX_CONTEXT_FOR_SUMMARY == 50000
+        assert config.MAX_CONTEXT_FOR_CLOUD == 100000
+        assert config.CASCADE_BUDGET_SECONDS == 40.0
+    finally:
+        monkeypatch.delenv("SMART_TRIM_NUM_CTX", raising=False)
+        monkeypatch.delenv("SMART_TRIM_MAX_CONTEXT_LOCAL", raising=False)
+        monkeypatch.delenv("SMART_TRIM_MAX_CONTEXT_CLOUD", raising=False)
+        monkeypatch.delenv("SMART_TRIM_CASCADE_BUDGET_SECONDS", raising=False)
+        importlib.reload(config)
+        importlib.reload(sum_cmd)
+
+
+def test_ollama_endpoint_rejects_remote_or_credentialed_urls(monkeypatch):
+    import importlib
+
+    from smart_trim.shared import config
+
+    for unsafe in ("http://example.com:11434", "https://localhost:11434", "http://u:p@localhost"):
+        monkeypatch.setenv("SMART_TRIM_OLLAMA_BASE", unsafe)
+        importlib.reload(config)
+        assert config.OLLAMA_BASE == "http://localhost:11434"
+    monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
+    importlib.reload(config)
