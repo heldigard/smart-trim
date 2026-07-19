@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 from unittest import mock
 
 from smart_trim.features.capabilities import command as caps
@@ -20,13 +21,22 @@ def test_capabilities_payload_lists_smoke():
     assert "precompact" in names
 
 
-def test_handle_cli_smoke_raises_system_exit():
+def _install_fake_shim(tmp_path, monkeypatch) -> None:
+    """Point Path.home at tmp and create the wired shim path (CI has no ~/.claude)."""
+    monkeypatch.setattr(caps.Path, "home", classmethod(lambda cls: tmp_path))
+    shim = tmp_path / ".claude" / "hooks" / "smart-trim.py"
+    shim.parent.mkdir(parents=True, exist_ok=True)
+    shim.write_text("#!/usr/bin/env python3\n# fake\n", encoding="utf-8")
+
+
+def test_handle_cli_smoke_raises_system_exit(tmp_path, monkeypatch):
     """`handle_cli(['smoke'])` exits with the shim subprocess exit code.
 
-    We intercept subprocess.run so the test does not require the actual shim
-    file to exist (CI runners may not have it). The shim is faked as a process
-    that prints a valid hook payload.
+    We intercept subprocess.run so the test does not require the actual hook
+    process. A real shim *file* is still required (CI runners have none under
+    ~/.claude), so we plant one under a fake HOME.
     """
+    _install_fake_shim(tmp_path, monkeypatch)
     fake_payload = json.dumps({"continue": True, "method": "minimal"})
     fake_proc = mock.Mock(
         returncode=0,
@@ -67,8 +77,6 @@ def test_handle_cli_returns_false_for_unknown_args():
 
 
 def test_handle_cli_help_prints():
-    import io
-
     buf = io.StringIO()
     with mock.patch.object(caps.sys, "stdout", buf):
         handled = caps.handle_cli(["--help"])
@@ -86,6 +94,16 @@ def test_handle_cli_capabilities_prints_human_table():
     assert "smoke" in out
 
 
+def test_handle_cli_capabilities_json():
+    buf = io.StringIO()
+    with mock.patch.object(caps.sys, "stdout", buf):
+        handled = caps.handle_cli(["capabilities", "--json"])
+    assert handled is True
+    payload = json.loads(buf.getvalue())
+    assert payload["command"] == "capabilities"
+    assert any(c["name"] == "doctor" for c in payload["capabilities"])
+
+
 def test_run_smoke_returns_nonzero_when_shim_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(caps.Path, "home", classmethod(lambda cls: tmp_path))
     code = caps.run_smoke()
@@ -93,9 +111,48 @@ def test_run_smoke_returns_nonzero_when_shim_missing(tmp_path, monkeypatch):
 
 
 def test_run_smoke_unparseable_stdout(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))
-    shim = tmp_path / ".claude" / "hooks" / "smart-trim.py"
-    shim.parent.mkdir(parents=True, exist_ok=True)
-    shim.write_text("#!/usr/bin/env python3\nprint('not-json')\n", encoding="utf-8")
-    code = caps.run_smoke()
+    _install_fake_shim(tmp_path, monkeypatch)
+    fake_proc = mock.Mock(returncode=0, stdout="not-json", stderr="")
+    with mock.patch.object(caps.subprocess, "run", return_value=fake_proc):
+        code = caps.run_smoke()
     assert code == 5
+
+
+def test_run_smoke_timeout(tmp_path, monkeypatch):
+    _install_fake_shim(tmp_path, monkeypatch)
+
+    def boom(*_a, **_k):
+        raise subprocess.TimeoutExpired(cmd="shim", timeout=30)
+
+    with mock.patch.object(caps.subprocess, "run", side_effect=boom):
+        code = caps.run_smoke()
+    assert code == 3
+
+
+def test_run_smoke_oserror(tmp_path, monkeypatch):
+    _install_fake_shim(tmp_path, monkeypatch)
+
+    def boom(*_a, **_k):
+        raise OSError("exec failed")
+
+    with mock.patch.object(caps.subprocess, "run", side_effect=boom):
+        code = caps.run_smoke()
+    assert code == 4
+
+
+def test_run_smoke_nonzero_exit(tmp_path, monkeypatch):
+    _install_fake_shim(tmp_path, monkeypatch)
+    fake_proc = mock.Mock(returncode=7, stdout="", stderr="boom")
+    with mock.patch.object(caps.subprocess, "run", return_value=fake_proc):
+        code = caps.run_smoke()
+    assert code == 7
+
+
+def test_run_smoke_happy_path(tmp_path, monkeypatch, capsys):
+    _install_fake_shim(tmp_path, monkeypatch)
+    fake_payload = json.dumps({"continue": True, "method": "minimal"})
+    fake_proc = mock.Mock(returncode=0, stdout=fake_payload, stderr="")
+    with mock.patch.object(caps.subprocess, "run", return_value=fake_proc):
+        code = caps.run_smoke()
+    assert code == 0
+    assert "[smoke] OK" in capsys.readouterr().out

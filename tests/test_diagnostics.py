@@ -232,22 +232,6 @@ def test_collect_checks_and_json_mode(tmp_path, monkeypatch):
 
 
 def test_agent_memory_available_handles_import_error(monkeypatch):
-    import builtins
-
-    real_import = builtins.__import__
-
-    def boom(name, *args, **kwargs):
-        if name == "agent_memory" or name.startswith("agent_memory"):
-            raise ModuleNotFoundError(name)
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", boom)
-    # importlib.import_module uses __import__; force a clean path via monkeypatch on helper
-    monkeypatch.setattr(
-        doc,
-        "_agent_memory_available",
-        doc._agent_memory_available,  # keep real, but patch import_module
-    )
     import importlib
 
     monkeypatch.setattr(
@@ -256,6 +240,34 @@ def test_agent_memory_available_handles_import_error(monkeypatch):
         lambda name: (_ for _ in ()).throw(ModuleNotFoundError(name)),
     )
     assert doc._agent_memory_available() is False
+
+
+def test_cascade_helpers_reports_compat_bindings():
+    helpers = doc._cascade_helpers()
+    assert set(helpers) == {"ollama_client", "cheap_complete", "cg_reset"}
+    assert all(isinstance(v, bool) for v in helpers.values())
+
+
+def test_shim_present_false_when_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(doc, "_shim_path", lambda: tmp_path / "missing-shim.py")
+    assert doc._shim_present() is False
+
+
+def test_shim_present_true_for_file(tmp_path, monkeypatch):
+    shim = tmp_path / "smart-trim.py"
+    shim.write_text("# ok\n", encoding="utf-8")
+    monkeypatch.setattr(doc, "_shim_path", lambda: shim)
+    assert doc._shim_present() is True
+
+
+def test_shim_present_false_on_oserror(tmp_path, monkeypatch):
+    class _Boom(type(tmp_path)):
+        def is_file(self):  # noqa: N802
+            raise OSError("permission denied")
+
+    bad = _Boom(tmp_path / "x")
+    monkeypatch.setattr(doc, "_shim_path", lambda: bad)
+    assert doc._shim_present() is False
 
 
 # --- capabilities wiring ------------------------------------------------------
