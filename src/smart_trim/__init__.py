@@ -13,6 +13,6 @@ from __future__ import annotations
 # feature imports its LLM client. Imported for its side effects, not its names.
 from smart_trim.shared import compat  # noqa: F401
 
-__version__ = "3.3.0"
+__version__ = "3.4.0"
 
 __all__ = ["__version__"]

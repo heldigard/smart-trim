@@ -47,6 +47,16 @@ CAPABILITIES: tuple[dict[str, Any], ...] = (
         "cost": "fast",
         "writes": "temporary isolated memory bank only",
     },
+    {
+        "name": "doctor",
+        "purpose": "Check Ollama reachability, cascade model install state, deps, and writability.",
+        "read_only": False,
+        "destructive": False,
+        "idempotent": True,
+        "open_world": True,
+        "cost": "fast",
+        "writes": "creates target dirs if missing (memory-bank, archive); removes its own temp probes",
+    },
 )
 
 
@@ -61,7 +71,7 @@ def capabilities_payload() -> dict[str, Any]:
 
 
 def help_text() -> str:
-    return """usage: smart-trim [--help] [--version] [capabilities [--json]] [smoke]
+    return """usage: smart-trim [--help] [--version] [capabilities [--json]] [smoke] [doctor]
 
 PreCompact hook that preserves a grounded project handoff before context
 compression. Normal hook mode reads one JSON event from stdin.
@@ -69,6 +79,7 @@ compression. Normal hook mode reads one JSON event from stdin.
 commands:
   capabilities          show side effects, cost, and degradation contract
   smoke                 run a synthetic PreCompact payload end-to-end (debug aid)
+  doctor                check Ollama reachability, model install state, deps, writability
 
 options:
   -h, --help            show this help
@@ -158,6 +169,12 @@ def handle_cli(args: list[str]) -> bool:
         return True
     if args and args[0] == "smoke":
         raise SystemExit(run_smoke())
+    if args and args[0] == "doctor":
+        # Lazy import: doctor pulls in urllib + summarize accessors; keep it off
+        # the normal PreCompact hook path (capabilities is imported at hook load).
+        from smart_trim.features.diagnostics import command as diagnostics
+
+        raise SystemExit(diagnostics.run_doctor())
     return False
 
 

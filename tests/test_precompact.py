@@ -467,12 +467,14 @@ def test_precompact_main_entry(monkeypatch, capsys):
 def test_precompact_version_does_not_read_stdin(monkeypatch, capsys):
     import sys
 
+    from smart_trim import __version__
+
     monkeypatch.setattr(sys, "argv", ["smart-trim", "--version"])
     monkeypatch.setattr(sys, "stdin", None)
 
     precompact.main()
 
-    assert capsys.readouterr().out.strip() == "smart-trim 3.3.0"
+    assert capsys.readouterr().out.strip() == f"smart-trim {__version__}"
 
 
 def test_precompact_help_is_discoverable_without_reading_stdin(monkeypatch, capsys):

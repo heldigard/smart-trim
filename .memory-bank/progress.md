@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-07-18 — v3.4.0: `doctor` subcommand + coverage hardening (SHIPPED)
+
+Native-Ubuntu improvement pass. No hook-behavior change; additive only.
+- NEW `features/diagnostics/command.py` → `smart-trim doctor`: probes Ollama
+  `/api/tags` (stdlib `urllib`, 0 deps), checks primary/secondary models
+  installed, agent-memory importable, memory-bank + archive writable, cascade
+  budget sane. FAIL only on core-function breakage (memory-bank unwritable,
+  self-defeating budget); Ollama/model/agent-memory gaps = WARN (cascade still
+  hands off via cloud/fallback). Wired via `capabilities.handle_cli` (lazy
+  import → off the hook path). `smoke` only proves offline fallback; `doctor`
+  verifies the LLM tier is wired.
+- Coverage closed on safety-critical code: `shared/filelock.py` 72%→100%
+  (retry/timeout/OSError/unlock-error/fcntl-absent), `shared/config.py`
+  95%→100% (loopback + positive_float/int edge cases).
+- `summarize`: added `primary_model()`/`secondary_model()` accessors (DRY for
+  doctor; avoids duplicating env defaults).
+- Version 3.3.0→3.4.0; version test now asserts against `__version__` (future-
+  proof). README got a Diagnostics section.
+- Gate: ruff + format + mypy clean; 304 pytest pass; coverage 98.39% (≥95 gate).
+
 ## 2026-07-03 — vertical-slice split SHIPPED (v3.2 monolith → v3.3.0 package)
 
 8 commits (F0-F7). All verification green:

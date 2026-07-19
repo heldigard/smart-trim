@@ -128,6 +128,16 @@ def summarize_secondary(
     return summarize_ollama(context, _SECONDARY_MODEL, grounding=grounding, timeout=timeout)
 
 
+def primary_model() -> str:
+    """Env-resolved PRIMARY model tag (the cascade tier + the doctor check)."""
+    return _PRIMARY_MODEL
+
+
+def secondary_model() -> str:
+    """Env-resolved SECONDARY model tag (the cascade tier + the doctor check)."""
+    return _SECONDARY_MODEL
+
+
 def primary_label() -> str:
     """Stable, env-aware label for the PRIMARY tier (drives the `method` field).
 
@@ -229,6 +239,8 @@ __all__ = [
     "summarize_primary",
     "summarize_secondary",
     "summarize_cloud_cascade",
+    "primary_model",
+    "secondary_model",
     "primary_label",
     "secondary_label",
     "cloud_label",

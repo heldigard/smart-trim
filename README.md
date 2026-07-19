@@ -25,8 +25,21 @@ Vertical-slice package (`src/smart_trim/{shared,features}/`), graduated from a
 `~/.claude/hooks/smart-trim.py`.
 
 The `smart-trim` console entry is an operational surface for capabilities,
-version checks, smoke tests, and hook-compatible stdin; it does not replace the
-wired shim.
+version checks, smoke tests, a `doctor` health check, and hook-compatible
+stdin; it does not replace the wired shim.
+
+## Diagnostics
+
+```bash
+smart-trim --help          # usage (hook mode reads JSON on stdin)
+smart-trim capabilities    # side effects, cost, degradation contract
+smart-trim smoke           # synthetic PreCompact payload end-to-end (offline path)
+smart-trim doctor          # Ollama reachability + cascade model install + writability
+```
+
+`smoke` proves the offline fallback; `doctor` verifies the LLM tier is wired
+(Ollama up, primary/secondary models pulled via `/api/tags`, memory bank +
+archive writable, cascade budget sane). Zero non-stdlib deps.
 
 ## Install (dev)
 
@@ -51,5 +64,9 @@ no transcript or live objective, the hook preserves the existing handoff
 instead of overwriting it with an empty synthetic summary.
 
 ## Version
+
+3.4.0 — adds the `doctor` health-check subcommand (native-Ubuntu LLM-tier
+diagnostics) and closes coverage on the concurrency-critical file lock +
+config input-validation helpers.
 
 3.3.0 — vertical-slice split (was monolithic `smart-trim.py` v3.2).

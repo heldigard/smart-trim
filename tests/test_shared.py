@@ -430,3 +430,67 @@ def test_ollama_base_invalid_env_falls_back(monkeypatch):
     finally:
         monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
         importlib.reload(config)
+
+
+# --- config input-validation helpers ------------------------------------------
+
+
+def test_is_loopback_host_falsy_hostname_returns_false():
+    """An empty/None hostname short-circuits to False (paths.py:22 branch)."""
+    from smart_trim.shared import config
+
+    assert config._is_loopback_host("") is False
+    assert config._is_loopback_host(None) is False
+
+
+def test_is_loopback_host_non_ip_hostname_returns_false():
+    """A non-IP hostname (ValueError in ip_address) is not loopback."""
+    from smart_trim.shared import config
+
+    assert config._is_loopback_host("example.com") is False
+    assert config._is_loopback_host("10.0.0.5") is False  # not in loopback range
+
+
+def test_positive_float_invalid_returns_default():
+    from smart_trim.shared import config
+
+    assert config._positive_float("abc", 7.0) == 7.0  # ValueError -> default
+    assert config._positive_float(None, 7.0) == 7.0
+
+
+def test_positive_float_non_finite_or_non_positive_returns_default():
+    from smart_trim.shared import config
+
+    assert config._positive_float("nan", 7.0) == 7.0
+    assert config._positive_float("inf", 7.0) == 7.0
+    assert config._positive_float("-3", 7.0) == 7.0
+    assert config._positive_float("0", 7.0) == 7.0
+
+
+def test_positive_float_valid_passes_through():
+    from smart_trim.shared import config
+
+    assert config._positive_float("2.5", 7.0) == 2.5
+
+
+def test_positive_int_invalid_returns_default():
+    from smart_trim.shared import config
+
+    assert config._positive_int("abc", 5) == 5
+    assert config._positive_int("0", 5) == 5
+    assert config._positive_int("-2", 5) == 5
+
+
+def test_ollama_base_empty_hostname_falls_back(monkeypatch):
+    """``http://:11434`` parses hostname=None -> _is_loopback_host False -> default."""
+    import importlib
+
+    from smart_trim.shared import config
+
+    monkeypatch.setenv("SMART_TRIM_OLLAMA_BASE", "http://:11434")
+    importlib.reload(config)
+    try:
+        assert config.OLLAMA_BASE == "http://localhost:11434"
+    finally:
+        monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)
+        importlib.reload(config)
