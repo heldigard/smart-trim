@@ -32,14 +32,24 @@ stdin; it does not replace the wired shim.
 
 ```bash
 smart-trim --help          # usage (hook mode reads JSON on stdin)
+python -m smart_trim --help  # same entry as the console script
 smart-trim capabilities    # side effects, cost, degradation contract
 smart-trim smoke           # synthetic PreCompact payload end-to-end (offline path)
-smart-trim doctor          # Ollama reachability + cascade model install + writability
+smart-trim doctor          # Ollama + models + cascade helpers + shim + writability
+smart-trim doctor --json   # machine-readable health report
 ```
 
 `smoke` proves the offline fallback; `doctor` verifies the LLM tier is wired
-(Ollama up, primary/secondary models pulled via `/api/tags`, memory bank +
-archive writable, cascade budget sane). Zero non-stdlib deps.
+(Ollama up, primary/secondary models via `/api/tags`, `ollama_client` /
+`cheap_complete` / `agent-memory` importable **in this Python**, PreCompact shim
+present, memory bank + archive writable, cascade budget sane). Zero non-stdlib
+deps.
+
+**Note:** if `smart-trim` is installed as a `uv tool` (isolated env), doctor may
+WARN that `agent-memory` is missing even when the live hook (system `python3` +
+shim) can import it. Fix the tool env with
+`uv pip install -e ~/agent-memory --python $(uv tool dir --bin)/../smart-trim/bin/python`
+or reinstall the tool with `--with-editable ~/agent-memory`.
 
 ## Install (dev)
 
@@ -64,6 +74,9 @@ no transcript or live objective, the hook preserves the existing handoff
 instead of overwriting it with an empty synthetic summary.
 
 ## Version
+
+3.4.1 — doctor probes cascade helpers + PreCompact shim, `--json` report,
+`python -m smart_trim` entry; clearer agent-memory isolation guidance for uv-tool installs.
 
 3.4.0 — adds the `doctor` health-check subcommand (native-Ubuntu LLM-tier
 diagnostics) and closes coverage on the concurrency-critical file lock +

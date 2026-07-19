@@ -91,9 +91,17 @@ def _wire_mocks(
     models,
     agent_memory=True,
     archive_dir: Path,
+    helpers: dict[str, bool] | None = None,
+    shim_ok: bool = True,
 ):
     monkeypatch.setattr(doc, "_ollama_installed_models", lambda: models)
     monkeypatch.setattr(doc, "_agent_memory_available", lambda: agent_memory)
+    monkeypatch.setattr(
+        doc,
+        "_cascade_helpers",
+        lambda: helpers or {"ollama_client": True, "cheap_complete": True, "cg_reset": True},
+    )
+    monkeypatch.setattr(doc, "_shim_present", lambda: shim_ok)
     monkeypatch.setattr(doc._paths, "default_summaries_dir", lambda: archive_dir)
 
 
@@ -109,9 +117,10 @@ def test_run_doctor_all_green_exits_zero(tmp_path, monkeypatch):
     out = buf.getvalue()
     assert code == 0
     assert "[FAIL]" not in out
-    assert "ollama reachable" in out
-    assert "primary model installed" in out
-    assert "memory-bank writable" in out
+    assert "ollama: reachable" in out
+    assert "primary model:" in out
+    assert "memory bank:" in out
+    assert "python:" in out
     assert "Result: 0 failure" in out
 
 
@@ -122,7 +131,7 @@ def test_run_doctor_ollama_unreachable_is_warn_not_fail(tmp_path, monkeypatch):
     code = doc.run_doctor(project_root=tmp_path, stream=buf)
     out = buf.getvalue()
     assert code == 0  # degraded, not broken
-    assert "ollama unreachable" in out
+    assert "unreachable" in out
     assert "[FAIL]" not in out
 
 
@@ -133,9 +142,9 @@ def test_run_doctor_missing_model_is_warn(tmp_path, monkeypatch):
     code = doc.run_doctor(project_root=tmp_path, stream=buf)
     out = buf.getvalue()
     assert code == 0
-    assert "primary model installed: " in out
+    assert "primary model:" in out
     # A missing model shows as WARN (cascade still falls through), not FAIL.
-    assert "[WARN] primary model installed" in out
+    assert "[WARN] primary model:" in out
 
 
 def test_run_doctor_unwritable_memory_bank_is_fail(tmp_path, monkeypatch):
@@ -152,7 +161,7 @@ def test_run_doctor_unwritable_memory_bank_is_fail(tmp_path, monkeypatch):
     code = doc.run_doctor(project_root=blocker, stream=buf)
     out = buf.getvalue()
     assert code == 1
-    assert "[FAIL] memory-bank writable" in out
+    assert "[FAIL] memory bank:" in out
 
 
 def test_run_doctor_self_defeating_budget_is_fail(tmp_path, monkeypatch):
@@ -178,11 +187,83 @@ def test_run_doctor_resolves_project_root_when_none(monkeypatch, tmp_path):
     assert str(tmp_path) in buf.getvalue()
 
 
+def test_run_doctor_warns_on_missing_helpers_and_shim(tmp_path, monkeypatch):
+    archive = tmp_path / "archive"
+    _wire_mocks(
+        monkeypatch,
+        models={summarize.primary_model()},
+        archive_dir=archive,
+        helpers={"ollama_client": False, "cheap_complete": False, "cg_reset": False},
+        shim_ok=False,
+        agent_memory=False,
+    )
+    buf = io.StringIO()
+    code = doc.run_doctor(project_root=tmp_path, stream=buf)
+    out = buf.getvalue()
+    assert code == 0
+    assert "[WARN] helper ollama client:" in out
+    assert "[WARN] precompact shim:" in out
+    assert "[WARN] agent memory:" in out
+
+
+def test_collect_checks_and_json_mode(tmp_path, monkeypatch):
+    archive = tmp_path / "archive"
+    _wire_mocks(
+        monkeypatch,
+        models={summarize.primary_model(), summarize.secondary_model()},
+        archive_dir=archive,
+    )
+    report = doc.collect_checks(project_root=tmp_path)
+    assert report["ok"] is True
+    assert report["schema_version"] == 1
+    assert report["python"]
+    names = {c["name"] for c in report["checks"]}
+    assert "ollama" in names
+    assert "agent_memory" in names
+    assert "helper_ollama_client" in names
+    assert "precompact_shim" in names
+
+    buf = io.StringIO()
+    code = doc.run_doctor(project_root=tmp_path, stream=buf, as_json=True)
+    assert code == 0
+    parsed = json.loads(buf.getvalue())
+    assert parsed["command"] == "doctor"
+    assert parsed["ok"] is True
+
+
+def test_agent_memory_available_handles_import_error(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def boom(name, *args, **kwargs):
+        if name == "agent_memory" or name.startswith("agent_memory"):
+            raise ModuleNotFoundError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", boom)
+    # importlib.import_module uses __import__; force a clean path via monkeypatch on helper
+    monkeypatch.setattr(
+        doc,
+        "_agent_memory_available",
+        doc._agent_memory_available,  # keep real, but patch import_module
+    )
+    import importlib
+
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda name: (_ for _ in ()).throw(ModuleNotFoundError(name)),
+    )
+    assert doc._agent_memory_available() is False
+
+
 # --- capabilities wiring ------------------------------------------------------
 
 
 def test_help_text_mentions_doctor():
     assert "doctor" in caps.help_text()
+    assert "python -m smart_trim" in caps.help_text()
 
 
 def test_capabilities_payload_lists_doctor():
@@ -192,10 +273,11 @@ def test_capabilities_payload_lists_doctor():
 
 def test_handle_cli_doctor_dispatches_to_run_doctor(monkeypatch):
     """``handle_cli(['doctor'])`` exits with run_doctor's code (doctor not re-run here)."""
-    captured = {"called": False}
+    captured = {"called": False, "as_json": None}
 
-    def fake_run_doctor(project_root=None, *, stream=None):  # noqa: ARG001
+    def fake_run_doctor(project_root=None, *, stream=None, as_json=False):  # noqa: ARG001
         captured["called"] = True
+        captured["as_json"] = as_json
         return 0
 
     monkeypatch.setattr("smart_trim.features.diagnostics.command.run_doctor", fake_run_doctor)
@@ -206,3 +288,21 @@ def test_handle_cli_doctor_dispatches_to_run_doctor(monkeypatch):
     else:
         raise AssertionError("SystemExit not raised")
     assert captured["called"] is True
+    assert captured["as_json"] is False
+
+
+def test_handle_cli_doctor_json_flag(monkeypatch):
+    captured = {"as_json": None}
+
+    def fake_run_doctor(project_root=None, *, stream=None, as_json=False):  # noqa: ARG001
+        captured["as_json"] = as_json
+        return 0
+
+    monkeypatch.setattr("smart_trim.features.diagnostics.command.run_doctor", fake_run_doctor)
+    try:
+        caps.handle_cli(["doctor", "--json"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:
+        raise AssertionError("SystemExit not raised")
+    assert captured["as_json"] is True

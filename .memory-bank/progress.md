@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-07-18 — v3.4.1: doctor depth + module entry (SHIPPED)
+
+Native-Ubuntu follow-up after v3.4.0.
+- `doctor` now probes cascade helpers (`ollama_client`, `cheap_complete`, `cg_reset`),
+  PreCompact shim presence, prints the active Python interpreter, and supports
+  `--json` via `collect_checks()` for machine-readable health.
+- `python -m smart_trim` entry (`__main__.py`) matches the console script surface.
+- Clearer agent-memory WARN when the isolated `uv tool` env lacks the package while
+  the live hook (system python3 + shim) still has freshness filtering.
+- Ops: reinstalled `uv tool` with `--with-editable ~/agent-memory`; project venv
+  also has agent-memory editable.
+- Gate: full pytest green, ruff check/format, mypy clean; diagnostics ~240L under meta.
+
+
 ## 2026-07-18 — v3.4.0: `doctor` subcommand + coverage hardening (SHIPPED)
 
 Native-Ubuntu improvement pass. No hook-behavior change; additive only.

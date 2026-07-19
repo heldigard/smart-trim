@@ -4,8 +4,9 @@
 whether the LLM tier is actually wired (Ollama up, primary/secondary models
 pulled). ``doctor`` fills that gap on a fresh native-Ubuntu install: it probes
 the local Ollama ``/api/tags``, confirms the cascade models are installed,
-verifies the optional ``agent-memory`` import, and checks that the memory bank
-+ summary archive are writable and the cascade budget is sane.
+verifies the optional ``agent-memory`` import, checks cascade helpers
+(``ollama_client`` / ``cheap_complete``), the PreCompact shim path, and that
+the memory bank + summary archive are writable and the cascade budget is sane.
 
 Zero non-stdlib dependencies (``urllib`` only). Runs solely on explicit
 ``smart-trim doctor`` invocation — never on the PreCompact hook path.
@@ -18,7 +19,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -29,6 +30,9 @@ from smart_trim.shared.config import CASCADE_BUDGET_SECONDS, CASCADE_MIN_TIER_SE
 _OK = "[OK]  "
 _WARN = "[WARN]"
 _FAIL = "[FAIL]"
+
+# Wired PreCompact entry; Claude/Codex/Gemini all resolve through this path.
+_SHIM_REL = Path(".claude") / "hooks" / "smart-trim.py"
 
 
 def _ollama_installed_models(timeout: float = 2.0) -> set[str] | None:
@@ -58,6 +62,32 @@ def _agent_memory_available() -> bool:
     return True
 
 
+def _cascade_helpers() -> dict[str, bool]:
+    """Report which harness helpers ``shared.compat`` resolved in this process."""
+    # Import inside the probe so doctor stays lazy for unit tests that only
+    # exercise Ollama/fs checks; compat already ran on package import.
+    from smart_trim.shared import compat as _compat
+
+    return {
+        "ollama_client": _compat.ollama_client is not None,
+        "cheap_complete": _compat.cheap_complete is not None,
+        "cg_reset": _compat.cg_reset is not None,
+    }
+
+
+def _shim_path() -> Path:
+    return Path.home() / _SHIM_REL
+
+
+def _shim_present() -> bool:
+    """True when the wired PreCompact shim exists (file or resolvable symlink)."""
+    path = _shim_path()
+    try:
+        return path.is_file()
+    except OSError:
+        return False
+
+
 def _dir_writable(path: Path) -> bool:
     """True if a temp probe file can be created and removed inside ``path``."""
     try:
@@ -70,8 +100,117 @@ def _dir_writable(path: Path) -> bool:
     return True
 
 
-def run_doctor(project_root: Path | None = None, *, stream: TextIO | None = None) -> int:
-    """Run every health check; print one status line per check.
+def collect_checks(project_root: Path | None = None) -> dict[str, Any]:
+    """Run every probe and return a machine-readable report (no I/O to streams)."""
+    root = project_root or _paths.get_project_root()
+    checks: list[dict[str, Any]] = []
+
+    def add(level: str, name: str, detail: str, **extra: Any) -> None:
+        row: dict[str, Any] = {"level": level, "name": name, "detail": detail}
+        row.update(extra)
+        checks.append(row)
+
+    installed = _ollama_installed_models()
+    primary = _summarize.primary_model()
+    secondary = _summarize.secondary_model()
+    if installed is None:
+        add("warn", "ollama", "unreachable — cascade degrades to cloud/rule-based")
+    else:
+        add("ok", "ollama", "reachable", models=sorted(installed)[:20])
+        add(
+            "ok" if primary in installed else "warn",
+            "primary_model",
+            primary,
+            installed=primary in installed,
+        )
+        add(
+            "ok" if secondary in installed else "warn",
+            "secondary_model",
+            secondary,
+            installed=secondary in installed,
+        )
+
+    am_ok = _agent_memory_available()
+    add(
+        "ok" if am_ok else "warn",
+        "agent_memory",
+        (
+            "importable (freshness filter)"
+            if am_ok
+            else "not importable in this Python — install agent-memory into this env "
+            f"({sys.executable}); hook may still see it via system site-packages"
+        ),
+    )
+
+    helpers = _cascade_helpers()
+    for key, ok in helpers.items():
+        add(
+            "ok" if ok else "warn",
+            f"helper_{key}",
+            "available" if ok else "missing — local/cloud cascade tier degraded",
+        )
+
+    shim = _shim_path()
+    add(
+        "ok" if _shim_present() else "warn",
+        "precompact_shim",
+        f"{'present' if _shim_present() else 'missing'}: {shim}",
+        path=str(shim),
+    )
+
+    memory_dir = root / ".memory-bank"
+    mem_ok = _dir_writable(memory_dir)
+    add(
+        "ok" if mem_ok else "fail",
+        "memory_bank",
+        f"{'writable' if mem_ok else 'unwritable'}: {memory_dir}",
+        path=str(memory_dir),
+    )
+
+    archive = _paths.default_summaries_dir()
+    arch_ok = _dir_writable(archive)
+    add(
+        "ok" if arch_ok else "warn",
+        "summary_archive",
+        f"{'writable' if arch_ok else 'unwritable'}: {archive}",
+        path=str(archive),
+    )
+
+    if CASCADE_BUDGET_SECONDS <= CASCADE_MIN_TIER_SECONDS:
+        add(
+            "fail",
+            "cascade_budget",
+            f"{CASCADE_BUDGET_SECONDS}s <= min tier {CASCADE_MIN_TIER_SECONDS}s — no tier can run",
+        )
+    else:
+        add(
+            "ok",
+            "cascade_budget",
+            f"{CASCADE_BUDGET_SECONDS}s > min tier {CASCADE_MIN_TIER_SECONDS}s",
+        )
+
+    failures = sum(1 for c in checks if c["level"] == "fail")
+    warnings = sum(1 for c in checks if c["level"] == "warn")
+    return {
+        "command": "doctor",
+        "schema_version": 1,
+        "project": str(root),
+        "python": sys.executable,
+        "ollama_endpoint": OLLAMA_BASE,
+        "checks": checks,
+        "failures": failures,
+        "warnings": warnings,
+        "ok": failures == 0,
+    }
+
+
+def run_doctor(
+    project_root: Path | None = None,
+    *,
+    stream: TextIO | None = None,
+    as_json: bool = False,
+) -> int:
+    """Run every health check; print one status line per check (or JSON).
 
     Returns ``1`` if any check FAILs (the hook's core persist function is
     broken), ``0`` otherwise. WARNs (graceful degradation — Ollama down, a model
@@ -80,59 +219,22 @@ def run_doctor(project_root: Path | None = None, *, stream: TextIO | None = None
 
     ``stream`` defaults to stdout and is injectable for tests.
     """
+    report = collect_checks(project_root)
     out = stream or sys.stdout
-    root = project_root or _paths.get_project_root()
-    failures = 0
-    warnings = 0
+    if as_json:
+        out.write(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+        return 0 if report["ok"] else 1
 
-    def emit(level: str, message: str) -> None:
-        nonlocal failures, warnings
-        out.write(f"  {level} {message}\n")
-        if level == _FAIL:
-            failures += 1
-        elif level == _WARN:
-            warnings += 1
-
-    out.write(f"smart-trim doctor (project: {root})\n")
-    out.write(f"  ollama endpoint: {OLLAMA_BASE}\n")
-
-    installed = _ollama_installed_models()
-    primary = _summarize.primary_model()
-    secondary = _summarize.secondary_model()
-    if installed is None:
-        emit(_WARN, "ollama unreachable — cascade degrades to cloud/rule-based")
-    else:
-        emit(_OK, "ollama reachable")
-        emit(_OK if primary in installed else _WARN, f"primary model installed: {primary}")
-        emit(_OK if secondary in installed else _WARN, f"secondary model installed: {secondary}")
-
-    emit(
-        _OK if _agent_memory_available() else _WARN,
-        "agent-memory importable (freshness filter)",
-    )
-
-    memory_dir = root / ".memory-bank"
-    # memory-bank unwritable defeats the hook's core purpose (persisting the
-    # handoff) — the only hard FAIL besides a self-defeating cascade budget.
-    emit(_OK if _dir_writable(memory_dir) else _FAIL, f"memory-bank writable: {memory_dir}")
-
-    archive = _paths.default_summaries_dir()
-    emit(_OK if _dir_writable(archive) else _WARN, f"summary archive writable: {archive}")
-
-    if CASCADE_BUDGET_SECONDS <= CASCADE_MIN_TIER_SECONDS:
-        emit(
-            _FAIL,
-            f"cascade budget {CASCADE_BUDGET_SECONDS}s <= min tier {CASCADE_MIN_TIER_SECONDS}s"
-            " — no tier can run",
-        )
-    else:
-        emit(
-            _OK,
-            f"cascade budget {CASCADE_BUDGET_SECONDS}s > min tier {CASCADE_MIN_TIER_SECONDS}s",
-        )
-
-    out.write(f"Result: {failures} failure(s), {warnings} warning(s)\n")
-    return 1 if failures else 0
+    level_tag = {"ok": _OK, "warn": _WARN, "fail": _FAIL}
+    out.write(f"smart-trim doctor (project: {report['project']})\n")
+    out.write(f"  python: {report['python']}\n")
+    out.write(f"  ollama endpoint: {report['ollama_endpoint']}\n")
+    for check in report["checks"]:
+        tag = level_tag.get(check["level"], _WARN)
+        name = check["name"].replace("_", " ")
+        out.write(f"  {tag} {name}: {check['detail']}\n")
+    out.write(f"Result: {report['failures']} failure(s), {report['warnings']} warning(s)\n")
+    return 0 if report["ok"] else 1
 
 
-__all__ = ["run_doctor"]
+__all__ = ["collect_checks", "run_doctor"]

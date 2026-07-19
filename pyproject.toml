@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smart-trim"
-version = "3.4.0"
+version = "3.4.1"
 description = "LLM-powered PreCompact context-compression hook for Claude Code (Ollama-local, cloud fallback)."
 readme = "README.md"
 requires-python = ">=3.11"

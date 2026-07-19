@@ -71,7 +71,7 @@ def capabilities_payload() -> dict[str, Any]:
 
 
 def help_text() -> str:
-    return """usage: smart-trim [--help] [--version] [capabilities [--json]] [smoke] [doctor]
+    return """usage: smart-trim [--help] [--version] [capabilities [--json]] [smoke] [doctor [--json]]
 
 PreCompact hook that preserves a grounded project handoff before context
 compression. Normal hook mode reads one JSON event from stdin.
@@ -79,11 +79,13 @@ compression. Normal hook mode reads one JSON event from stdin.
 commands:
   capabilities          show side effects, cost, and degradation contract
   smoke                 run a synthetic PreCompact payload end-to-end (debug aid)
-  doctor                check Ollama reachability, model install state, deps, writability
+  doctor [--json]       check Ollama, models, cascade helpers, shim, deps, writability
 
 options:
   -h, --help            show this help
   --version             show package version
+
+Also: python -m smart_trim  (same entry as the console script)
 
 hook smoke:
   printf '{"trigger":"manual","sessionId":"smoke","cwd":"/project"}' | smart-trim
@@ -174,7 +176,8 @@ def handle_cli(args: list[str]) -> bool:
         # the normal PreCompact hook path (capabilities is imported at hook load).
         from smart_trim.features.diagnostics import command as diagnostics
 
-        raise SystemExit(diagnostics.run_doctor())
+        as_json = "--json" in args[1:]
+        raise SystemExit(diagnostics.run_doctor(as_json=as_json))
     return False
 
 
