@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json  # noqa: F401
-import time  # noqa: F401
-from pathlib import Path  # noqa: F401
+import json
+from pathlib import Path
 
-from smart_trim.features.precompact import command as precompact  # noqa: F401
+from smart_trim.features.precompact import command as precompact
 
 
 def _seed_session(tmp_path: Path, user_content: str = "fix the parser") -> Path:

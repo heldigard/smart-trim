@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor  # noqa: F401
-from contextlib import contextmanager  # noqa: F401
-from pathlib import Path  # noqa: F401
-from typing import cast  # noqa: F401
+from pathlib import Path
+from typing import cast
 
-from smart_trim.features.writer import active as active_renderer  # noqa: F401
-from smart_trim.features.writer import command as writer  # noqa: F401
+from smart_trim.features.writer import command as writer
 
 
 def test_foreign_session_true_when_paths_outside(tmp_path):

@@ -55,4 +55,4 @@ try:
 except Exception:  # pragma: no cover - env-dependent
     cheap_complete = None  # type: ignore[assignment]
 
-__all__ = ["cg_reset", "ollama_client", "cheap_complete"]
+__all__ = ["cg_reset", "cheap_complete", "ollama_client"]

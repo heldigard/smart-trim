@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor  # noqa: F401
-from contextlib import contextmanager  # noqa: F401
-from pathlib import Path  # noqa: F401
-from typing import cast  # noqa: F401
-
-from smart_trim.features.writer import active as active_renderer  # noqa: F401
-from smart_trim.features.writer import command as writer  # noqa: F401
+from smart_trim.features.writer import active as active_renderer
 
 
 def test_compact_items_preserves_whole_items_that_fit():

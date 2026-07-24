@@ -101,4 +101,4 @@ def check_memory_hygiene(max_files: int = 150, summary_dir: Path | None = None) 
         return None
 
 
-__all__ = ["cleanup_old_summaries", "check_memory_hygiene"]
+__all__ = ["check_memory_hygiene", "cleanup_old_summaries"]

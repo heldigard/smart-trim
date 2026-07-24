@@ -367,8 +367,8 @@ def test_objective_registry_stale_age_none(tmp_path, monkeypatch):
 def test_same_or_nested_project_errors():
     from pathlib import Path
 
-    assert not grounding._same_or_nested_project("\x00", Path("."))
-    assert not grounding._same_or_nested_project("", Path("."))
+    assert not grounding._same_or_nested_project("\x00", Path())
+    assert not grounding._same_or_nested_project("", Path())
 
 
 def test_same_or_nested_project_nested_current(tmp_path):

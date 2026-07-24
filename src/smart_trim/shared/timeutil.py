@@ -36,4 +36,4 @@ def hours_since_iso(value: str) -> float | None:
     return (now - dt).total_seconds() / 3600.0
 
 
-__all__ = ["objective_injection_window_hours", "hours_since_iso"]
+__all__ = ["hours_since_iso", "objective_injection_window_hours"]

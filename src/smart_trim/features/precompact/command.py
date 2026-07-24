@@ -18,6 +18,7 @@ discarded, so the summary is saved to the agent memory bank and surfaced via
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import secrets
@@ -117,10 +118,8 @@ def _safe_reset_cg() -> None:
     """Reset context-guard turn counter so warnings start fresh post-compact."""
     if _compat.cg_reset is None:
         return
-    try:
+    with contextlib.suppress(Exception):
         _compat.cg_reset()
-    except Exception:
-        pass
 
 
 def _elapsed_ms(start_monotonic: float) -> int:
@@ -131,14 +130,12 @@ def _elapsed_ms(start_monotonic: float) -> int:
 def _record_event(project_root: Path, event: _observability.CompactEvent) -> None:
     """Best-effort observability append. Never raises; gate is checked inside.
 
-    Wrapped in a try/except so the recorder (an opt-in side channel) cannot
-    ever convert a successful compaction into a failure. Five lines, not a
-    fancier abstraction — the call site already knows every field.
+    Wrapped in ``contextlib.suppress`` so the recorder (an opt-in side channel)
+    cannot ever convert a successful compaction into a failure. Five lines, not
+    a fancier abstraction — the call site already knows every field.
     """
-    try:
+    with contextlib.suppress(Exception):
         _observability.record_compact_event(project_root, event)
-    except Exception:
-        pass
 
 
 def _build_grounding(project_root: Path) -> tuple[str, str]:

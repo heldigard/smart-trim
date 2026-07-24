@@ -473,12 +473,11 @@ def test_read_session_read_oserror(monkeypatch, tmp_path):
     f = tmp_path / "read_error.jsonl"
     f.write_text("{}", encoding="utf-8")
 
-    original_open = open
-
-    def fake_open(file, *args, **kwargs):
-        if str(file) == str(f):
+    def fake_open(self, *args, **kwargs):
+        if self == f:
             raise OSError("permission denied")
-        return original_open(file, *args, **kwargs)
+        raise AssertionError(f"unexpected open: {self}")
 
-    monkeypatch.setattr("builtins.open", fake_open)
+    # read_session opens via Path.open, not the builtin open.
+    monkeypatch.setattr(Path, "open", fake_open)
     assert session.read_session(f) == []

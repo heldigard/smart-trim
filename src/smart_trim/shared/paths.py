@@ -107,4 +107,4 @@ def default_summaries_dir() -> Path:
     return Path.home() / ".claude" / "summaries"
 
 
-__all__ = ["get_project_root", "redact_sensitive", "slugify", "default_summaries_dir"]
+__all__ = ["default_summaries_dir", "get_project_root", "redact_sensitive", "slugify"]

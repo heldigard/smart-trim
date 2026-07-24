@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from _helpers import (  # noqa: F401
-    _COMPAT,
+from _helpers import (
     _OLLAMA,
     _SESSION,
     _SUMMARIZE,

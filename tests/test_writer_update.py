@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor  # noqa: F401
-from contextlib import contextmanager  # noqa: F401
-from pathlib import Path  # noqa: F401
-from typing import cast  # noqa: F401
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from pathlib import Path
 
-from smart_trim.features.writer import active as active_renderer  # noqa: F401
-from smart_trim.features.writer import command as writer  # noqa: F401
+from smart_trim.features.writer import command as writer
 
 
 def test_update_writes_active_context(tmp_path):

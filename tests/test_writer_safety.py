@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor  # noqa: F401
-from contextlib import contextmanager  # noqa: F401
-from pathlib import Path  # noqa: F401
-from typing import cast  # noqa: F401
+from pathlib import Path
 
 import pytest
 
-from smart_trim.features.writer import active as active_renderer  # noqa: F401
-from smart_trim.features.writer import command as writer  # noqa: F401
+from smart_trim.features.writer import active as active_renderer
+from smart_trim.features.writer import command as writer
 
 
 def test_write_active_limits_lines(tmp_path):

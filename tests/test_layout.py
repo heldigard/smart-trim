@@ -36,7 +36,7 @@ def _python_modules() -> list[tuple[str, int]]:
     out = []
     for path in sorted(SRC.rglob("*.py")):
         rel = path.relative_to(SRC).as_posix()
-        out.append((rel, sum(1 for _ in path.open(encoding="utf-8"))))
+        out.append((rel, len(path.read_text(encoding="utf-8").splitlines())))
     return out
 
 
@@ -70,7 +70,7 @@ def test_allowlist_modules_are_actually_over():
     """An ALLOWLIST entry that no longer exceeds the meta is stale — remove it."""
     for rel in ALLOWLIST:
         path = SRC / rel
-        n = sum(1 for _ in path.open(encoding="utf-8"))
+        n = len(path.read_text(encoding="utf-8").splitlines())
         assert n > META, f"{rel} is in ALLOWLIST but only {n}L <= {META}; drop the exception"
 
 

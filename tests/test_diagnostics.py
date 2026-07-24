@@ -37,7 +37,7 @@ def test_ollama_installed_models_parses_tags():
         def __exit__(self, *_):
             return False
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
         assert "/api/tags" in req.full_url
         return _Resp(fake_payload)
 
@@ -52,7 +52,7 @@ def test_ollama_installed_models_parses_tags():
 def test_ollama_installed_models_returns_none_on_urlerror():
     from urllib.error import URLError
 
-    def boom(req, timeout):  # noqa: ARG001
+    def boom(req, timeout):
         raise URLError("connection refused")
 
     orig = doc.urlopen
@@ -75,7 +75,7 @@ def test_ollama_installed_models_returns_none_on_bad_json():
             return False
 
     orig = doc.urlopen
-    doc.urlopen = lambda req, timeout: _Resp()  # noqa: ARG001, E731
+    doc.urlopen = lambda req, timeout: _Resp()
     try:
         assert doc._ollama_installed_models() is None
     finally:
@@ -262,7 +262,7 @@ def test_shim_present_true_for_file(tmp_path, monkeypatch):
 
 def test_shim_present_false_on_oserror(tmp_path, monkeypatch):
     class _Boom(type(tmp_path)):
-        def is_file(self):  # noqa: N802
+        def is_file(self):
             raise OSError("permission denied")
 
     bad = _Boom(tmp_path / "x")
@@ -287,7 +287,7 @@ def test_handle_cli_doctor_dispatches_to_run_doctor(monkeypatch):
     """``handle_cli(['doctor'])`` exits with run_doctor's code (doctor not re-run here)."""
     captured = {"called": False, "as_json": None}
 
-    def fake_run_doctor(project_root=None, *, stream=None, as_json=False):  # noqa: ARG001
+    def fake_run_doctor(project_root=None, *, stream=None, as_json=False):
         captured["called"] = True
         captured["as_json"] = as_json
         return 0
@@ -306,7 +306,7 @@ def test_handle_cli_doctor_dispatches_to_run_doctor(monkeypatch):
 def test_handle_cli_doctor_json_flag(monkeypatch):
     captured = {"as_json": None}
 
-    def fake_run_doctor(project_root=None, *, stream=None, as_json=False):  # noqa: ARG001
+    def fake_run_doctor(project_root=None, *, stream=None, as_json=False):
         captured["as_json"] = as_json
         return 0
 

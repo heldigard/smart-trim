@@ -76,11 +76,8 @@ def _extract_errors(normalized: list[dict[str, Any]]) -> list[str]:
 
 
 def _error_lines(raw: str) -> list[str]:
-    out: list[str] = []
-    for line in raw.split("\n"):
-        if _text_has_any(line, ("error", "exception", "failed")):
-            out.append(line.strip()[:200])
-    return out
+    cues = ("error", "exception", "failed")
+    return [line.strip()[:200] for line in raw.split("\n") if _text_has_any(line, cues)]
 
 
 def _text_has_any(text: str, cues: tuple[str, ...]) -> bool:

@@ -391,8 +391,8 @@ def test_ollama_base_env_override_accepts_loopback_url(monkeypatch, value, expec
     monkeypatch.setenv("SMART_TRIM_OLLAMA_BASE", value)
     importlib.reload(config)
     try:
-        assert config.OLLAMA_BASE == value
-        assert config.OLLAMA_HOST == expected_host
+        assert value == config.OLLAMA_BASE
+        assert expected_host == config.OLLAMA_HOST
         assert config.OLLAMA_PORT == 11500
     finally:
         monkeypatch.delenv("SMART_TRIM_OLLAMA_BASE", raising=False)

@@ -238,8 +238,8 @@ def _any_path_under_root(paths: list[str], root: str) -> bool:
 
 
 __all__ = [
-    "update_agent_memory",
     "append_project_topic",
-    "update_topic_index",
     "mark_handoff_non_authoritative",
+    "update_agent_memory",
+    "update_topic_index",
 ]

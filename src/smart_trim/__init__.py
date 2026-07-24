@@ -11,7 +11,7 @@ from __future__ import annotations
 
 # Side effect: sys.path bootstrap + graceful helper imports. MUST run before any
 # feature imports its LLM client. Imported for its side effects, not its names.
-from smart_trim.shared import compat  # noqa: F401
+from smart_trim.shared import compat  # noqa: F401  # side-effect import, see docstring
 
 __version__ = "3.4.1"
 

@@ -204,7 +204,7 @@ def read_session(session_file: Path) -> list[dict[str, Any]]:
         return []
     cap = _session_tail_bytes()
     try:
-        with open(session_file, "rb") as f:
+        with session_file.open("rb") as f:
             if 0 < cap < size:
                 f.seek(size - cap)
                 f.readline()  # drop the partial line at the seek boundary
@@ -227,9 +227,9 @@ def _parse_jsonl_line(line: str) -> dict[str, Any] | None:
 
 
 __all__ = [
+    "extract_context_for_summary",
     "find_latest_session_jsonl",
     "get_session_file",
     "get_session_id",
     "read_session",
-    "extract_context_for_summary",
 ]

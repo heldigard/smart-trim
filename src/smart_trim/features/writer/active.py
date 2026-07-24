@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 ACTIVE_CONTEXT_MAX_CHARS = 1200
@@ -305,10 +306,8 @@ def atomic_write_text(path: Path, content: str) -> None:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temp_path, path)
+        temp_path.replace(path)
     except Exception:
-        try:
+        with suppress(OSError):
             temp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
         raise

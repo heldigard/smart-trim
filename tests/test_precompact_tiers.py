@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import time
 
-from _helpers import (  # noqa: F401
+from _helpers import (
     _COMPAT,
     _OLLAMA,
     _SESSION,
     _SUMMARIZE,
     _WRITER,
     _disable_external,
-    _routed_precompact,
     _seed_session,
 )
 

@@ -4,17 +4,6 @@ from __future__ import annotations
 
 import json
 
-from _helpers import (  # noqa: F401
-    _COMPAT,
-    _OLLAMA,
-    _SESSION,
-    _SUMMARIZE,
-    _WRITER,
-    _disable_external,
-    _routed_precompact,
-    _seed_session,
-)
-
 from smart_trim.features.precompact import command as precompact
 
 
