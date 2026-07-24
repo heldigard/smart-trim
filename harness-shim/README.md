@@ -26,16 +26,21 @@ ln -sfn ~/smart-trim/harness-shim/smart-trim.py ~/.gemini/hooks/smart-trim.py
 ```
 
 After symlink, the wired path is byte-identical to this template. The drift
-detector (`tests/test_layout.py::test_shim_matches_canonical`) compares
+detector (`tests/test_layout.py::test_live_shim_matches_canonical`) compares
 content; a symlink reads through to the canonical source so drift is
 structurally impossible.
 
 ## Drift detector
 
-`pytest tests/test_layout.py -q` includes a contract check that the live shim
-contains the canonical import line. The check is `skipif` the wired path
-doesn't exist (CI environments without the harness live shim), so it never
-fails when run on a fresh checkout.
+`pytest tests/test_layout.py -q` runs two contract checks:
+
+- `test_canonical_shim_is_tracked` — always runs: this template exists and
+  carries the canonical `from smart_trim.features.precompact.command import
+  main` line.
+- `test_live_shim_matches_canonical` — byte-compares the live wired shim
+  against this template; it `pytest.skip`s when the wired path doesn't exist
+  (CI/dev without the harness live shim), so it never fails on a fresh
+  checkout.
 
 ## Editing rules
 

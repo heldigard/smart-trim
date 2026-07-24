@@ -23,15 +23,18 @@ growing a general-purpose command application.
 
 ```
 src/smart_trim/
-  shared/        config, paths, ollama, timeutil, compat (infra; no feature deps)
+  shared/        config, paths, ollama, timeutil, filelock, compat (infra; no feature deps)
   features/
-    session/     discover Claude session + extract conversation context
-    summarize/   LLM cascade (ollama primary/secondary -> cloud tertiary)
-    fallback/    deterministic rule-based handoff (always succeeds)
-    grounding/   read currentTask/progress/activeContext/objective (read-side)
-    writer/      persist handoff to .memory-bank + topic index (write-side)
-    hygiene/     rotate/audit archived summaries
-    precompact/  orchestrator handle_precompact + main entry
+    session/       discover Claude session + extract conversation context
+    summarize/     LLM cascade (ollama primary/secondary -> cloud tertiary)
+    fallback/      deterministic rule-based handoff (always succeeds)
+    grounding/     read currentTask/progress/activeContext/objective (read-side)
+    writer/        persist handoff to .memory-bank + topic index (write-side)
+    hygiene/       rotate/audit archived summaries
+    observability/ gated append-only compact-event record (opt-in, no PII)
+    diagnostics/   `doctor` one-shot runtime health check (+ wiring inspection)
+    capabilities/  --help / capabilities / smoke discovery (off the hook path)
+    precompact/    orchestrator handle_precompact + main entry
 ```
 
 ## Conventions
