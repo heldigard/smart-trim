@@ -73,40 +73,42 @@ def append_project_topic(memory_dir: Path, title: str, content: str) -> None:
     topics_dir.mkdir(parents=True, exist_ok=True)
     slug = slugify(title)
     topic = topics_dir / f"{slug}.md"
-    with topic.open("a+", encoding="utf-8") as handle:
-        with filelock.try_exclusive_lock(handle, timeout_seconds=0.25) as acquired:
-            if not acquired:
-                return
-            handle.seek(0, os.SEEK_END)
-            if handle.tell() == 0:
-                handle.write(
-                    f"# {title}\n> Deep memory topic. Read on demand; keep entries factual.\n"
-                )
-            handle.write(f"\n## {datetime.now().isoformat(timespec='seconds')}\n")
-            handle.write(content.strip()[:4000] + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+    with (
+        topic.open("a+", encoding="utf-8") as handle,
+        filelock.try_exclusive_lock(handle, timeout_seconds=0.25) as acquired,
+    ):
+        if not acquired:
+            return
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(f"# {title}\n> Deep memory topic. Read on demand; keep entries factual.\n")
+        handle.write(f"\n## {datetime.now().isoformat(timespec='seconds')}\n")
+        handle.write(content.strip()[:4000] + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
     update_topic_index(topics_dir, slug, title)
 
 
 def update_topic_index(topics_dir: Path, slug: str, title: str) -> None:
     index = topics_dir / "_index.md"
-    with index.open("a+", encoding="utf-8") as handle:
-        with filelock.try_exclusive_lock(handle, timeout_seconds=0.25) as acquired:
-            if not acquired:
-                return
-            handle.seek(0)
-            content = handle.read()
-            if not content:
-                handle.write(
-                    "# Topic Index\n> Deep agent memory. Search/read on demand; "
-                    "do not load all topics by default.\n\n## Topics\n"
-                )
-            if f"({slug}.md)" not in content:
-                handle.seek(0, os.SEEK_END)
-                handle.write(f"- [{title}]({slug}.md)\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+    with (
+        index.open("a+", encoding="utf-8") as handle,
+        filelock.try_exclusive_lock(handle, timeout_seconds=0.25) as acquired,
+    ):
+        if not acquired:
+            return
+        handle.seek(0)
+        content = handle.read()
+        if not content:
+            handle.write(
+                "# Topic Index\n> Deep agent memory. Search/read on demand; "
+                "do not load all topics by default.\n\n## Topics\n"
+            )
+        if f"({slug}.md)" not in content:
+            handle.seek(0, os.SEEK_END)
+            handle.write(f"- [{title}]({slug}.md)\n")
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 # Harness/meta signals. The HOME meta bank is a catch-all for sessions launched

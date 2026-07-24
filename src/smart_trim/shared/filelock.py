@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import IO
 
 try:
@@ -43,7 +43,5 @@ def try_exclusive_lock(handle: IO[str], *, timeout_seconds: float = 0.0) -> Iter
     try:
         yield True
     finally:
-        try:
+        with suppress(OSError):
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-        except OSError:
-            pass

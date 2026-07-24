@@ -90,8 +90,8 @@ def parse_summary_fields(summary: str) -> tuple[dict[str, list[str]], list[str]]
         if not line or line == HANDOFF_AUTHORITY_NOTICE:
             continue
         lowered = line.lower()
-        if lowered.startswith("## session constraints (quoted") or lowered.startswith(
-            "## preserved negative constraints"
+        if lowered.startswith(
+            ("## session constraints (quoted", "## preserved negative constraints")
         ):
             current = "Constraints"
             continue
