@@ -49,6 +49,7 @@ def test_try_cloud_skips_when_budget_exhausted(monkeypatch):
     )
     text, method, chain = precompact._try_cloud([], "g", "", deadline=time.monotonic() - 1.0)
     assert (text, method) == (None, None)
+    assert chain == []  # budget exhausted -> no tier attempted
     assert calls == {"cloud": 0}
 
 
@@ -66,6 +67,11 @@ def test_try_local_passes_shrinking_timeout_to_primary(monkeypatch):
     assert text == "primary ok"
     assert captured["timeout"] <= 30.0 * 0.6 + 0.01
     assert captured["timeout"] > 0.0
+    # Primary success: chain holds exactly the (env-aware) primary label.
+    from smart_trim.features.summarize import command as summarize_cmd
+
+    assert method == summarize_cmd.primary_label()
+    assert chain == [method]
 
 
 def test_try_local_skips_both_tiers_when_budget_exhausted(monkeypatch):
@@ -83,7 +89,29 @@ def test_try_local_skips_both_tiers_when_budget_exhausted(monkeypatch):
     )
     text, method, chain = precompact._try_local("ctx", "g", deadline=time.monotonic() - 1.0)
     assert (text, method) == (None, None)
+    assert chain == []  # budget exhausted -> neither tier appended
     assert calls == {"primary": 0, "secondary": 0}
+
+
+def test_try_local_skips_secondary_when_deadline_expires_mid_cascade(monkeypatch):
+    """Budget is re-checked between tiers: a primary that burns the deadline
+    leaves the secondary with < floor remaining, so it is skipped."""
+    monkeypatch.setattr(precompact._ollama, "is_ollama_alive", lambda: True)
+    monkeypatch.setattr(
+        precompact._summarize, "summarize_primary", lambda context, grounding="", **_kw: None
+    )
+    # Fake clock: 90.0 for the primary check (deadline 100 -> 10s left, primary
+    # runs) then 98.0 for the secondary check (2s left < 3s floor -> skipped).
+    clock = iter([90.0, 98.0])
+    monkeypatch.setattr(precompact.time, "monotonic", lambda: next(clock, 98.0))
+
+    text, method, chain = precompact._try_local("ctx", "g", deadline=100.0)
+    assert text is None
+    assert method is None
+    # Primary was attempted; the deadline lapsed before secondary could run.
+    from smart_trim.features.summarize import command as summarize_cmd
+
+    assert chain == [summarize_cmd.primary_label()]
 
 
 def test_cloud_tier_used_when_ollama_down(tmp_path, monkeypatch):
@@ -156,6 +184,8 @@ def test_precompact_secondary_ollama_success(tmp_path, monkeypatch):
     from smart_trim.features.summarize import command as summarize_cmd
 
     assert method == summarize_cmd.secondary_label()
+    # Secondary success: chain records primary then secondary, in order.
+    assert chain == [summarize_cmd.primary_label(), method]
 
 
 def test_precompact_try_local_returns_none_none(monkeypatch):
@@ -170,3 +200,7 @@ def test_precompact_try_local_returns_none_none(monkeypatch):
     text, method, chain = precompact._try_local("context", "grounding")
     assert text is None
     assert method is None
+    # Both tiers were attempted even though neither produced text.
+    from smart_trim.features.summarize import command as summarize_cmd
+
+    assert chain == [summarize_cmd.primary_label(), summarize_cmd.secondary_label()]

@@ -49,7 +49,7 @@ CAPABILITIES: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "doctor",
-        "purpose": "Check Ollama reachability, cascade model install state, deps, and writability.",
+        "purpose": "Check models, dependencies, hook wiring/timeouts, and writability.",
         "read_only": False,
         "destructive": False,
         "idempotent": True,
@@ -79,7 +79,7 @@ compression. Normal hook mode reads one JSON event from stdin.
 commands:
   capabilities          show side effects, cost, and degradation contract
   smoke                 run a synthetic PreCompact payload end-to-end (debug aid)
-  doctor [--json]       check Ollama, models, cascade helpers, shim, deps, writability
+  doctor [--json]       check models, deps, hook wiring/timeouts, and writability
 
 options:
   -h, --help            show this help

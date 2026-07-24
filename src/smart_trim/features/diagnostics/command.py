@@ -6,7 +6,8 @@ pulled). ``doctor`` fills that gap on a fresh native-Ubuntu install: it probes
 the local Ollama ``/api/tags``, confirms the cascade models are installed,
 verifies the optional ``agent-memory`` import, checks cascade helpers
 (``ollama_client`` / ``cheap_complete``), the PreCompact shim path, and that
-the memory bank + summary archive are writable and the cascade budget is sane.
+the Claude/Codex hook wiring and timeout, the memory bank + summary archive are
+writable, and the cascade budget is sane.
 
 Zero non-stdlib dependencies (``urllib`` only). Runs solely on explicit
 ``smart-trim doctor`` invocation — never on the PreCompact hook path.
@@ -23,6 +24,7 @@ from typing import Any, TextIO
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from smart_trim.features.diagnostics import wiring as _wiring
 from smart_trim.features.summarize import command as _summarize
 from smart_trim.shared import paths as _paths
 from smart_trim.shared.config import CASCADE_BUDGET_SECONDS, CASCADE_MIN_TIER_SECONDS, OLLAMA_BASE
@@ -30,9 +32,6 @@ from smart_trim.shared.config import CASCADE_BUDGET_SECONDS, CASCADE_MIN_TIER_SE
 _OK = "[OK]  "
 _WARN = "[WARN]"
 _FAIL = "[FAIL]"
-
-# Wired PreCompact entry; Claude/Codex/Gemini all resolve through this path.
-_SHIM_REL = Path(".claude") / "hooks" / "smart-trim.py"
 
 
 def _ollama_installed_models(timeout: float = 2.0) -> set[str] | None:
@@ -73,19 +72,6 @@ def _cascade_helpers() -> dict[str, bool]:
         "cheap_complete": _compat.cheap_complete is not None,
         "cg_reset": _compat.cg_reset is not None,
     }
-
-
-def _shim_path() -> Path:
-    return Path.home() / _SHIM_REL
-
-
-def _shim_present() -> bool:
-    """True when the wired PreCompact shim exists (file or resolvable symlink)."""
-    path = _shim_path()
-    try:
-        return path.is_file()
-    except OSError:
-        return False
 
 
 def _dir_writable(path: Path) -> bool:
@@ -150,13 +136,7 @@ def collect_checks(project_root: Path | None = None) -> dict[str, Any]:
             "available" if ok else "missing — local/cloud cascade tier degraded",
         )
 
-    shim = _shim_path()
-    add(
-        "ok" if _shim_present() else "warn",
-        "precompact_shim",
-        f"{'present' if _shim_present() else 'missing'}: {shim}",
-        path=str(shim),
-    )
+    checks.extend(_wiring.collect_runtime_checks(CASCADE_BUDGET_SECONDS))
 
     memory_dir = root / ".memory-bank"
     mem_ok = _dir_writable(memory_dir)

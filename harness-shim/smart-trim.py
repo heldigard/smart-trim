@@ -10,6 +10,7 @@ Source of truth: ``~/smart-trim/src/smart_trim/``. History/changelog there.
 If the package ever fails to import, fail OPEN (never block compaction).
 """
 
+import contextlib
 import os
 import sys
 from pathlib import Path
@@ -21,10 +22,8 @@ def _bootstrap_source() -> None:
         candidates.append(Path(home))
     here = Path(__file__).resolve()
     candidates.extend([here.parent, here.parent.parent])
-    try:
+    with contextlib.suppress(IndexError):
         candidates.append(here.parents[2] / "smart-trim")
-    except IndexError:
-        pass
     candidates.append(Path.home() / "smart-trim")
 
     for project in candidates:

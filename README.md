@@ -35,15 +35,17 @@ smart-trim --help          # usage (hook mode reads JSON on stdin)
 python -m smart_trim --help  # same entry as the console script
 smart-trim capabilities    # side effects, cost, degradation contract
 smart-trim smoke           # synthetic PreCompact payload end-to-end (offline path)
-smart-trim doctor          # Ollama + models + cascade helpers + shim + writability
+smart-trim doctor          # models + deps + hook wiring/timeouts + writability
 smart-trim doctor --json   # machine-readable health report
 ```
 
 `smoke` proves the offline fallback; `doctor` verifies the LLM tier is wired
 (Ollama up, primary/secondary models via `/api/tags`, `ollama_client` /
-`cheap_complete` / `agent-memory` importable **in this Python**, PreCompact shim
-present, memory bank + archive writable, cascade budget sane). Zero non-stdlib
-deps.
+`cheap_complete` / `agent-memory` importable **in this Python**), verifies that
+the Claude shim delegates to the package, checks Claude/Codex `PreCompact`
+commands and their timeout headroom, and probes memory-bank + archive
+writability. Zero non-stdlib deps. The JSON report never echoes raw hook
+commands or unrelated settings.
 
 **Note:** if `smart-trim` is installed as a `uv tool` (isolated env), doctor may
 WARN that `agent-memory` is missing even when the live hook (system `python3` +

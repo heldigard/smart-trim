@@ -101,7 +101,29 @@ def _wire_mocks(
         "_cascade_helpers",
         lambda: helpers or {"ollama_client": True, "cheap_complete": True, "cg_reset": True},
     )
-    monkeypatch.setattr(doc, "_shim_present", lambda: shim_ok)
+    runtime_checks = [
+        {
+            "level": "ok" if shim_ok else "fail",
+            "name": "precompact_shim",
+            "detail": "delegates to package entry" if shim_ok else "missing or stale",
+            "path": "/test/.claude/hooks/smart-trim.py",
+        },
+        {
+            "level": "ok",
+            "name": "claude_precompact",
+            "detail": "Claude PreCompact wired with 90s timeout",
+            "path": "/test/.claude/settings.json",
+            "configured": True,
+            "matches": 1,
+            "timeout_seconds": 90.0,
+            "cascade_budget_seconds": 40.0,
+        },
+    ]
+    monkeypatch.setattr(
+        doc._wiring,
+        "collect_runtime_checks",
+        lambda cascade_budget_seconds: runtime_checks,
+    )
     monkeypatch.setattr(doc._paths, "default_summaries_dir", lambda: archive_dir)
 
 
@@ -200,9 +222,9 @@ def test_run_doctor_warns_on_missing_helpers_and_shim(tmp_path, monkeypatch):
     buf = io.StringIO()
     code = doc.run_doctor(project_root=tmp_path, stream=buf)
     out = buf.getvalue()
-    assert code == 0
+    assert code == 1
     assert "[WARN] helper ollama client:" in out
-    assert "[WARN] precompact shim:" in out
+    assert "[FAIL] precompact shim:" in out
     assert "[WARN] agent memory:" in out
 
 
@@ -248,28 +270,6 @@ def test_cascade_helpers_reports_compat_bindings():
     assert all(isinstance(v, bool) for v in helpers.values())
 
 
-def test_shim_present_false_when_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr(doc, "_shim_path", lambda: tmp_path / "missing-shim.py")
-    assert doc._shim_present() is False
-
-
-def test_shim_present_true_for_file(tmp_path, monkeypatch):
-    shim = tmp_path / "smart-trim.py"
-    shim.write_text("# ok\n", encoding="utf-8")
-    monkeypatch.setattr(doc, "_shim_path", lambda: shim)
-    assert doc._shim_present() is True
-
-
-def test_shim_present_false_on_oserror(tmp_path, monkeypatch):
-    class _Boom(type(tmp_path)):
-        def is_file(self):
-            raise OSError("permission denied")
-
-    bad = _Boom(tmp_path / "x")
-    monkeypatch.setattr(doc, "_shim_path", lambda: bad)
-    assert doc._shim_present() is False
-
-
 # --- capabilities wiring ------------------------------------------------------
 
 
@@ -304,7 +304,7 @@ def test_handle_cli_doctor_dispatches_to_run_doctor(monkeypatch):
 
 
 def test_handle_cli_doctor_json_flag(monkeypatch):
-    captured = {"as_json": None}
+    captured: dict[str, bool | None] = {"as_json": None}
 
     def fake_run_doctor(project_root=None, *, stream=None, as_json=False):
         captured["as_json"] = as_json

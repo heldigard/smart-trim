@@ -7,9 +7,15 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on the same ref (push to a PR branch, repeated pushes).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -28,4 +34,13 @@ jobs:
       - name: Type check
         run: mypy src
       - name: Run offline tests
-        run: pytest --cov=smart_trim --cov-report=term-missing --cov-fail-under=95
+        # source, branch, and the 95% gate live in pyproject [tool.coverage.*].
+        run: pytest --cov
+      - name: Smoke the wired shim
+        # CI runners lack ~/.claude; plant the minimal delegating shim the hook
+        # uses, then run the package's own smoke against a synthetic payload.
+        run: |
+          mkdir -p "$HOME/.claude/hooks"
+          printf 'from smart_trim.features.precompact.command import main\nmain()\n' \
+            > "$HOME/.claude/hooks/smart-trim.py"
+          python -m smart_trim smoke

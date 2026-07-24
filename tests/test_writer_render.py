@@ -31,6 +31,7 @@ def test_parse_summary_fields_generic_header():
     summary = "## Some Other Header\n**Task**: fix it"
     fields, notes = active_renderer.parse_summary_fields(summary)
     assert fields["Task"] == ["fix it"]
+    assert notes == []  # well-formed label -> no parser warnings
 
 
 def test_render_active_fields_critical_does_not_fit():

@@ -152,3 +152,6 @@ def test_precompact_minimal_handoff_empty_messages(tmp_path, monkeypatch):
         session_file, grounding="", session_id="s", trigger="auto"
     )
     assert method == "minimal"
+    assert text  # minimal handoff is non-empty
+    assert preserved == ""  # no grounding -> no preserved constraints
+    assert chain == []  # minimal handoff attempts no LLM tier
